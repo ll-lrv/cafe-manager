@@ -1,0 +1,22 @@
+{
+  "name": "@cafe/db",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.0",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5"
+  }
+}
