@@ -10,7 +10,8 @@
     "test": "turbo run test",
     "db:generate": "pnpm --filter @cafe/db generate",
     "db:migrate": "supabase db push",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > apps/web/src/lib/supabase/database.types.ts"
   },
   "devDependencies": {
     "turbo": "^2",

@@ -15,6 +15,20 @@
       "when": 1790992400095,
       "tag": "20261003015320_supabase_auth_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790993199224,
+      "tag": "20261003020639_store_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790993200883,
+      "tag": "20261003020640_store_invitations_rls",
+      "breakpoints": true
     }
   ]
 }

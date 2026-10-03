@@ -9,6 +9,6 @@ export default defineConfig({
   migrations: { prefix: "supabase" },
   schemaFilter: ["public"],
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    url: process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
   },
 });
