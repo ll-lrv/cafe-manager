@@ -29,6 +29,13 @@
       "when": 1790993200883,
       "tag": "20261003020640_store_invitations_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791255378538,
+      "tag": "20261006025618_catalog_triggers",
+      "breakpoints": true
     }
   ]
 }

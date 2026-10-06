@@ -23,6 +23,8 @@ export function dbErrorMessage(error: { code?: string; message: string }): strin
   if (error.code === "P0001") return error.message;
   if (error.code === "42501") return "권한이 없습니다.";
   if (error.code === "23505") return "이미 존재하는 항목입니다.";
+  if (error.code === "23503") return "다른 기록에서 사용 중이라 삭제할 수 없습니다.";
+  if (error.code === "23514") return "입력값이 올바르지 않습니다.";
   return "처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.";
 }
 

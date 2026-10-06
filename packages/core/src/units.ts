@@ -29,7 +29,7 @@ export function toBaseUnitCost(pricePerUnit: number, unit?: Pick<ItemUnit, "fact
   return Math.round((pricePerUnit / factor) * 10000) / 10000;
 }
 
-const BASE_UNIT_LABEL: Record<BaseUnit, string> = { g: "g", ml: "ml", ea: "개" };
+export const BASE_UNIT_LABEL: Record<BaseUnit, string> = { g: "g", ml: "ml", ea: "개" };
 
 /**
  * 기본 단위 수량을 사람이 읽기 좋게 표시한다.

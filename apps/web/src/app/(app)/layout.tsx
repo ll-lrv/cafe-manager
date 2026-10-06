@@ -11,7 +11,10 @@ import { NavLinks, type NavItem } from "./nav-links";
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const [user, store] = await Promise.all([requireUser(), requireCurrentStore()]);
 
-  const nav: NavItem[] = [{ href: "/dashboard", label: "대시보드" }];
+  const nav: NavItem[] = [
+    { href: "/dashboard", label: "대시보드" },
+    { href: "/items", label: "품목" },
+  ];
   if (can(store.role, "member:manage")) nav.push({ href: "/settings/members", label: "직원 관리" });
 
   return (

@@ -2,12 +2,11 @@
 
 import { ROLE_LABEL, type MemberRole } from "@cafe/core";
 import { Check, Copy } from "lucide-react";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { toast } from "sonner";
-import { Field, FormMessage, NativeSelect, SubmitButton } from "@/components/form-parts";
+import { Field, FormMessage, NativeSelect, SubmitButton, useToastResult } from "@/components/form-parts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ActionState } from "@/lib/api/errors";
 import {
   cancelInvitationAction,
   changeRoleAction,
@@ -17,14 +16,6 @@ import {
 
 function inviteUrl(token: string) {
   return `${window.location.origin}/invite/${token}`;
-}
-
-/** 서버 액션 결과를 토스트로 보여준다. */
-function useToastResult(state: ActionState) {
-  useEffect(() => {
-    if (state?.error) toast.error(state.error);
-    else if (state?.message) toast.success(state.message);
-  }, [state]);
 }
 
 export function CopyLinkButton({ token }: { token: string }) {
