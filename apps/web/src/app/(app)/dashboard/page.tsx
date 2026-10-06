@@ -7,16 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listItems } from "@/lib/api/catalog";
+import { listSales } from "@/lib/api/sales";
 import { getStockLevels, listLotLevels, listMovements } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { requireUser } from "@/lib/api/session";
-import { buildItemLevels, storeToday, toLotView } from "@/lib/inventory";
+import { buildItemLevels, storeDayRange, storeToday, toLotView } from "@/lib/inventory";
 import { MovementList } from "../stock/movement-list";
 
 export const metadata: Metadata = { title: "대시보드" };
 
 const UPCOMING = [
-  { icon: Receipt, title: "메뉴·판매", description: "레시피 등록, 판매 입력 시 재료 자동 차감" },
   { icon: ClipboardList, title: "재고 실사", description: "실제 수량을 세서 장부와 맞추기" },
   { icon: Truck, title: "거래처·발주", description: "발주서 작성, 입고 처리" },
 ];
@@ -35,14 +35,17 @@ function MoreLink({ href, total }: { href: string; total: number }) {
 
 export default async function DashboardPage() {
   const [user, store] = await Promise.all([requireUser(), requireCurrentStore()]);
-  const [items, stock, lotLevels, movements] = await Promise.all([
+  const today = storeToday();
+  const [items, stock, lotLevels, movements, todaySales] = await Promise.all([
     listItems(store.storeId),
     getStockLevels(store.storeId),
     listLotLevels(store.storeId),
     listMovements(store.storeId, { limit: 5 }),
+    listSales(store.storeId, storeDayRange(today)),
   ]);
+  const todayCount = todaySales.reduce((sum, s) => sum + s.quantity, 0);
+  const todayAmount = todaySales.reduce((sum, s) => sum + s.amount, 0);
 
-  const today = storeToday();
   const activeItems = items.filter((i) => !i.archivedAt);
   const itemById = new Map(activeItems.map((i) => [i.id, i]));
   const levels = buildItemLevels(activeItems, stock, lotLevels, today);
@@ -68,11 +71,29 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-bold">안녕하세요, {user.displayName}님</h1>
           <p className="text-sm text-muted-foreground">{store.storeName}의 오늘 현황입니다.</p>
         </div>
-        <Link href="/stock" className={buttonVariants()}>
-          <ArrowRightLeft />
-          입출고 기록
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/stock" className={buttonVariants({ variant: "outline" })}>
+            <ArrowRightLeft />
+            입출고
+          </Link>
+          <Link href="/sales" className={buttonVariants()}>
+            <Receipt />
+            판매 입력
+          </Link>
+        </div>
       </div>
+
+      <Link href="/sales" className="block">
+        <Card size="sm" className="transition-colors hover:bg-muted/50">
+          <CardHeader>
+            <CardDescription>오늘 매출</CardDescription>
+            <CardTitle className="text-2xl font-bold tabular-nums">{todayAmount.toLocaleString("ko-KR")}원</CardTitle>
+            <CardAction className="text-sm text-muted-foreground tabular-nums">
+              {todayCount.toLocaleString("ko-KR")}개 판매
+            </CardAction>
+          </CardHeader>
+        </Card>
+      </Link>
 
       {activeItems.length === 0 ? (
         <Card>

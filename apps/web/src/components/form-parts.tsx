@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,11 @@ export function SubmitButton({
   size,
   "aria-label": ariaLabel,
   pending: pendingProp,
+  disabled = false,
 }: {
   children: React.ReactNode;
+  /** 제출할 수 없는 상태 (예: 입력값 없음) */
+  disabled?: boolean;
   /** useFormAction 처럼 form action 을 쓰지 않는 폼은 직접 넘긴다. */
   pending?: boolean;
   pendingText?: React.ReactNode;
@@ -31,7 +34,7 @@ export function SubmitButton({
   return (
     <Button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       className={className}
       variant={variant}
       size={size}
@@ -119,4 +122,54 @@ export function useFormAction(
   };
 
   return { state, pending, formProps: { ref: formRef, onSubmit } };
+}
+
+/**
+ * 서버 액션 하나를 부르는 버튼 (삭제·취소처럼 누르면 그 줄이 사라지는 곳).
+ * useActionState 로 결과를 받으면 줄이 사라지면서 결과도 함께 사라져 알림이 뜨지 않으므로,
+ * 액션이 끝난 자리에서 바로 알림을 띄운다.
+ */
+export function ActionButton({
+  action,
+  fields,
+  confirmMessage,
+  children,
+  pendingText = "처리 중…",
+  variant,
+  size,
+  "aria-label": ariaLabel,
+}: {
+  action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
+  /** 액션에 넘길 값 (폼의 hidden input 대신) */
+  fields: Record<string, string>;
+  /** 있으면 누를 때 확인을 받는다. */
+  confirmMessage?: string;
+  children: React.ReactNode;
+  pendingText?: React.ReactNode;
+  variant?: React.ComponentProps<typeof Button>["variant"];
+  size?: React.ComponentProps<typeof Button>["size"];
+  "aria-label"?: string;
+}) {
+  const [pending, startActionTransition] = useTransition();
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      size={size}
+      disabled={pending}
+      aria-label={ariaLabel}
+      onClick={() => {
+        if (confirmMessage && !confirm(confirmMessage)) return;
+        const formData = new FormData();
+        for (const [key, value] of Object.entries(fields)) formData.set(key, value);
+        startActionTransition(async () => {
+          const result = await action(undefined, formData);
+          if (result?.error) toast.error(result.error);
+          else if (result?.message) toast.success(result.message);
+        });
+      }}
+    >
+      {pending ? pendingText : children}
+    </Button>
+  );
 }

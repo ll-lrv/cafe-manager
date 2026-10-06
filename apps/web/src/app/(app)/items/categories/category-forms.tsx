@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useActionState } from "react";
-import { FormMessage, SubmitButton, useFormAction, useToastResult } from "@/components/form-parts";
+import { ActionButton, FormMessage, SubmitButton, useFormAction, useToastResult } from "@/components/form-parts";
 import { Input } from "@/components/ui/input";
 import type { Category } from "@/lib/api/catalog";
 import {
@@ -37,10 +37,8 @@ export function CategoryRow({ category, itemCount, isFirst, isLast }: {
 }) {
   const [renameState, renameAction] = useActionState(renameCategoryAction, undefined);
   const [moveState, moveAction] = useActionState(moveCategoryAction, undefined);
-  const [deleteState, deleteAction] = useActionState(deleteCategoryAction, undefined);
   useToastResult(renameState);
   useToastResult(moveState);
-  useToastResult(deleteState);
 
   return (
     <li className="flex flex-wrap items-center gap-2 py-2.5">
@@ -82,18 +80,17 @@ export function CategoryRow({ category, itemCount, isFirst, isLast }: {
         ) : (
           <span className="size-7" />
         )}
-        <form
-          action={deleteAction}
-          onSubmit={(e) => {
-            const note = itemCount > 0 ? ` 속한 품목 ${itemCount}개는 미분류가 됩니다.` : "";
-            if (!confirm(`'${category.name}' 카테고리를 삭제할까요?${note}`)) e.preventDefault();
-          }}
+        <ActionButton
+          action={deleteCategoryAction}
+          fields={{ categoryId: category.id }}
+          confirmMessage={`'${category.name}' 카테고리를 삭제할까요?${itemCount > 0 ? ` 속한 품목 ${itemCount}개는 미분류가 됩니다.` : ""}`}
+          variant="ghost"
+          size="icon-sm"
+          pendingText="…"
+          aria-label={`${category.name} 삭제`}
         >
-          <input type="hidden" name="categoryId" value={category.id} />
-          <SubmitButton variant="ghost" size="icon-sm" pendingText="…" aria-label={`${category.name} 삭제`}>
-            <Trash2 />
-          </SubmitButton>
-        </form>
+          <Trash2 />
+        </ActionButton>
       </div>
     </li>
   );

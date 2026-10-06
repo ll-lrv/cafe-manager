@@ -45,7 +45,7 @@ export async function cancelInvitationAction(_prev: ActionState, formData: FormD
     const store = await requireMemberManager();
     await cancelInvitation(store.storeId, String(formData.get("invitationId")));
     revalidatePath(PATH);
-    return { ok: true };
+    return { ok: true, message: "초대를 취소했습니다." };
   } catch (e) {
     return toActionError(e);
   }

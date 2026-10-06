@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   allocateFifo,
   can,
+  costRate,
   countAdjustments,
   dateInTimeZone,
   daysUntilExpiry,
@@ -11,6 +12,7 @@ import {
   formatQuantity,
   fromBaseQuantity,
   mergeDeltas,
+  recipeCost,
   roundQty,
   saleDeductions,
   stockStatus,
@@ -178,5 +180,23 @@ describe("stock-status", () => {
     expect(dateInTimeZone(now, "Asia/Seoul")).toBe("2026-10-07");
     expect(daysUntilExpiry("2026-10-10", dateInTimeZone(now, "Asia/Seoul"))).toBe(3);
     expect(daysUntilExpiry("2026-10-10", "2026-10-10")).toBe(0);
+  });
+});
+
+describe("recipe cost", () => {
+  const latte = [
+    { itemId: "beans", quantity: 18 },
+    { itemId: "milk", quantity: 200 },
+    { itemId: "cup", quantity: 1 },
+  ];
+
+  it("재료 원가를 더해 원 단위로 반올림한다", () => {
+    expect(recipeCost(latte, { beans: 25, milk: 2.5, cup: 80 })).toEqual({ cost: 1030, missing: [] });
+    expect(recipeCost(latte, { beans: 25.55, milk: 2.5 })).toEqual({ cost: 960, missing: ["cup"] });
+  });
+
+  it("원가율을 소수 첫째 자리까지 계산한다", () => {
+    expect(costRate(5000, 1030)).toBe(20.6);
+    expect(costRate(0, 100)).toBeNull();
   });
 });

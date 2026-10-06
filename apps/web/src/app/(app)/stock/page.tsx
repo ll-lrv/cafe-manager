@@ -6,6 +6,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { listCategories, listItems } from "@/lib/api/catalog";
 import { getStockLevels, listMovements } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
+import { activeItemsInCategoryOrder } from "@/lib/inventory";
 import { MovementList } from "./movement-list";
 import { StockForm, type StockItem } from "./stock-form";
 
@@ -22,15 +23,7 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
     listMovements(store.storeId, { itemId: selectedItemId }),
   ]);
 
-  // 보관 품목은 빼고, 카테고리 순서 → 이름 순 (미분류는 맨 뒤)
-  const order = new Map(categories.map((c, i) => [c.id, i]));
-  const items: StockItem[] = allItems
-    .filter((i) => !i.archivedAt)
-    .sort((a, b) => {
-      const ca = a.categoryId ? (order.get(a.categoryId) ?? 0) : Infinity;
-      const cb = b.categoryId ? (order.get(b.categoryId) ?? 0) : Infinity;
-      return ca === cb ? a.name.localeCompare(b.name, "ko") : ca - cb;
-    });
+  const items: StockItem[] = activeItemsInCategoryOrder(allItems, categories);
   const selectedItem = allItems.find((i) => i.id === selectedItemId);
 
   return (

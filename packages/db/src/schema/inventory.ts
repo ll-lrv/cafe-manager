@@ -131,3 +131,22 @@ export const lotStockLevels = pgView("lot_stock_levels", {
     group by l.id
     having sum(m.quantity) > 0
   `);
+
+/** 품목별 가장 최근 입고 단가 (기본 단위 1개당 원). 메뉴 원가 계산에 쓴다. */
+export const itemLatestCosts = pgView("item_latest_costs", {
+  itemId: uuid("item_id").notNull(),
+  storeId: uuid("store_id").notNull(),
+  unitCost: numeric("unit_cost", { precision: 14, scale: 4, mode: "number" }).notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+})
+  .with({ securityInvoker: true })
+  .as(sql`
+    select distinct on (m.item_id)
+      m.item_id,
+      m.store_id,
+      m.unit_cost,
+      m.occurred_at as received_at
+    from stock_movements m
+    where m.type = 'receive' and m.unit_cost is not null
+    order by m.item_id, m.occurred_at desc, m.created_at desc
+  `);

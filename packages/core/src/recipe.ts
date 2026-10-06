@@ -35,3 +35,27 @@ export function mergeDeltas(deltas: StockDelta[]): StockDelta[] {
     .filter(([, q]) => q !== 0)
     .map(([itemId, quantity]) => ({ itemId, quantity }));
 }
+
+/**
+ * 메뉴 1개 원가(원). 재료 사용량 × 재료의 기본 단위당 원가를 더해 원 단위로 반올림한다.
+ * 원가를 모르는 재료(입고 단가 기록 없음)는 빼고 계산하고 missing 으로 알려준다.
+ */
+export function recipeCost(
+  recipe: RecipeIngredient[],
+  unitCosts: Record<string, number | undefined>,
+): { cost: number; missing: string[] } {
+  let total = 0;
+  const missing: string[] = [];
+  for (const r of recipe) {
+    const unitCost = unitCosts[r.itemId];
+    if (unitCost === undefined) missing.push(r.itemId);
+    else total += r.quantity * unitCost;
+  }
+  return { cost: Math.round(total), missing };
+}
+
+/** 원가율(%). 가격이 0이면 null. 예) 가격 4,500원, 원가 900원 → 20 */
+export function costRate(price: number, cost: number): number | null {
+  if (price <= 0) return null;
+  return Math.round((cost / price) * 1000) / 10;
+}

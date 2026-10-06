@@ -517,7 +517,32 @@ isOneToOne: false
                 }
           }
           Views: {
-            "item_stock_levels": {
+            "item_latest_costs": {
+                  Row: {
+                    "item_id": string | null,"received_at": string | null,"store_id": string | null,"unit_cost": number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stock_movements_item_id_items_id_fk"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "item_stock_levels"
+      referencedColumns: ["item_id"]
+    },{
+      foreignKeyName: "stock_movements_item_id_items_id_fk"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_movements_store_id_stores_id_fk"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"item_stock_levels": {
                   Row: {
                     "is_low": boolean | null,"item_id": string | null,"quantity": number | null,"store_id": string | null
                   }
@@ -578,8 +603,14 @@ isOneToOne: false
 "is_store_member":
 { Args: { "p_store_id": string }; Returns: boolean
                            },
+"record_sales":
+{ Args: { "p_lines": Json,"p_sold_at"?: string }; Returns: number
+                           },
 "record_stock_movement":
 { Args: { "p_expires_on"?: string,"p_item_id": string,"p_memo"?: string,"p_quantity": number,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id"?: string,"p_unit_price"?: number }; Returns: number
+                           },
+"stock_outflow":
+{ Args: { "p_created_by": string,"p_factor": number,"p_item_id": string,"p_memo": string,"p_occurred_at": string,"p_quantity": number,"p_sale_record_id"?: string,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id": string }; Returns: number
                            }
           }
           Enums: {

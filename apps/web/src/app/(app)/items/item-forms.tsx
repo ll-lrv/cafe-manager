@@ -3,7 +3,15 @@
 import { BASE_UNIT_LABEL, formatQuantity, type BaseUnit } from "@cafe/core";
 import { Archive, ArchiveRestore, Star, Trash2 } from "lucide-react";
 import { useActionState, useState } from "react";
-import { Field, FormMessage, NativeSelect, SubmitButton, useFormAction, useToastResult } from "@/components/form-parts";
+import {
+  ActionButton,
+  Field,
+  FormMessage,
+  NativeSelect,
+  SubmitButton,
+  useFormAction,
+  useToastResult,
+} from "@/components/form-parts";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { Category, Item, ItemUnitInfo } from "@/lib/api/catalog";
@@ -207,9 +215,7 @@ function UnitRow({ itemId, unit, baseUnit, readOnly }: {
   readOnly: boolean;
 }) {
   const [defaultState, defaultAction] = useActionState(setDefaultUnitAction, undefined);
-  const [deleteState, deleteAction] = useActionState(deleteItemUnitAction, undefined);
   useToastResult(defaultState);
-  useToastResult(deleteState);
 
   return (
     <li className="flex flex-wrap items-center gap-2 py-2.5">
@@ -228,18 +234,17 @@ function UnitRow({ itemId, unit, baseUnit, readOnly }: {
               </SubmitButton>
             </form>
           )}
-          <form
-            action={deleteAction}
-            onSubmit={(e) => {
-              if (!confirm(`'${unit.name}' 단위를 삭제할까요?`)) e.preventDefault();
-            }}
+          <ActionButton
+            action={deleteItemUnitAction}
+            fields={{ itemId, unitId: unit.id }}
+            confirmMessage={`'${unit.name}' 단위를 삭제할까요?`}
+            variant="ghost"
+            size="icon-sm"
+            pendingText="…"
+            aria-label={`${unit.name} 단위 삭제`}
           >
-            <input type="hidden" name="itemId" value={itemId} />
-            <input type="hidden" name="unitId" value={unit.id} />
-            <SubmitButton variant="ghost" size="icon-sm" pendingText="…" aria-label={`${unit.name} 단위 삭제`}>
-              <Trash2 />
-            </SubmitButton>
-          </form>
+            <Trash2 />
+          </ActionButton>
         </div>
       )}
     </li>

@@ -2,7 +2,8 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * 매장의 재고·품목이 바뀌면 onChange 를 부른다. (다른 기기에서 기록한 입출고 포함)
+ * 매장의 재고·품목·판매가 바뀌면 onChange 를 부른다. (다른 기기에서 기록한 입출고·판매 포함)
+ * 삭제(판매 취소)는 필터를 걸 수 없어 전달되지 않는다. 취소한 기기에서만 바로 보이고 다른 기기는 다음 변경 때 반영된다.
  * 브라우저에서만 쓴다. RLS 로 내 매장 행만 전달된다.
  * NestJS 전환 시: WebSocket/SSE 게이트웨이 구독으로 바꾼다. (docs/db-functions.md "Supabase 전용 기능")
  */
@@ -23,6 +24,7 @@ export function subscribeStoreChanges(storeId: string, onChange: () => void): ()
       .channel(`store-changes:${storeId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "stock_movements", filter }, onChange)
       .on("postgres_changes", { event: "*", schema: "public", table: "items", filter }, onChange)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "sale_records", filter }, onChange)
       .subscribe();
   })();
 

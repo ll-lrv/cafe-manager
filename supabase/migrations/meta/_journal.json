@@ -43,6 +43,20 @@
       "when": 1791256684990,
       "tag": "20261006031804_record_stock_movement",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791259895683,
+      "tag": "20261006041135_item_latest_costs",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791259900283,
+      "tag": "20261006041140_record_sales",
+      "breakpoints": true
     }
   ]
 }

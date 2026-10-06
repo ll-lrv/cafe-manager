@@ -15,6 +15,8 @@ const PERMISSIONS = {
   "stock:count:complete": ["owner", "manager"],
   /** 판매 수량 입력 */
   "sale:record": ["owner", "manager", "staff"],
+  /** 판매 취소 (연결된 재료 차감도 함께 취소) */
+  "sale:cancel": ["owner", "manager"],
   /** 품목·카테고리·단위·메뉴·레시피 관리 */
   "catalog:manage": ["owner", "manager"],
   /** 거래처 관리 */

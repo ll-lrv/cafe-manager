@@ -6,14 +6,39 @@ import {
   type ExpiryStatus,
   type StockStatus,
 } from "@cafe/core";
-import type { Item } from "@/lib/api/catalog";
+import type { Category, Item } from "@/lib/api/catalog";
 import type { LotLevel } from "@/lib/api/stock";
 
 /** 매장 기준 시간대. 유통기한 "오늘"을 이 시간대로 센다. (매장별 설정은 나중에) */
 export const STORE_TIME_ZONE = "Asia/Seoul";
 
+/** STORE_TIME_ZONE 의 UTC 차이. 한국은 서머타임이 없어 고정이다. */
+const STORE_UTC_OFFSET = "+09:00";
+
 export function storeToday(): string {
   return dateInTimeZone(new Date(), STORE_TIME_ZONE);
+}
+
+/** 매장 기준 하루(YYYY-MM-DD)의 시작~다음 날 시작 (ISO) */
+export function storeDayRange(date: string): { from: string; to: string } {
+  const from = new Date(`${date}T00:00:00${STORE_UTC_OFFSET}`);
+  return { from: from.toISOString(), to: new Date(from.getTime() + 86_400_000).toISOString() };
+}
+
+/** 매장 기준 그 날의 마지막 순간 (지난 날짜의 판매를 하루 마감으로 입력할 때) */
+export function storeEndOfDay(date: string): string {
+  return new Date(`${date}T23:59:59${STORE_UTC_OFFSET}`).toISOString();
+}
+
+/** YYYY-MM-DD 에 n일 더하기 */
+export function addDays(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+export function isValidDate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 }
 
 export interface LotView extends LotLevel {
@@ -58,4 +83,16 @@ export function buildItemLevels(
         return [item.id, { quantity, status: stockStatus(quantity, item.minStock), expiry: nextLot?.expiry ?? null, nextLot }];
       }),
   );
+}
+
+/** 선택 목록용: 보관 품목을 빼고 카테고리 순서 → 이름 순 (미분류는 맨 뒤) */
+export function activeItemsInCategoryOrder<T extends Pick<Item, "name" | "categoryId" | "archivedAt">>(
+  items: T[],
+  categories: Category[],
+): T[] {
+  const order = new Map(categories.map((c, i) => [c.id, i]));
+  const rank = (item: T) => (item.categoryId ? (order.get(item.categoryId) ?? 0) : Infinity);
+  return items
+    .filter((i) => !i.archivedAt)
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "ko"));
 }

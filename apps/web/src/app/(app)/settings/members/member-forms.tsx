@@ -4,7 +4,7 @@ import { ROLE_LABEL, type MemberRole } from "@cafe/core";
 import { Check, Copy } from "lucide-react";
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
-import { Field, FormMessage, NativeSelect, SubmitButton, useToastResult } from "@/components/form-parts";
+import { ActionButton, Field, FormMessage, NativeSelect, SubmitButton, useToastResult } from "@/components/form-parts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -75,23 +75,16 @@ export function InviteForm() {
 }
 
 export function CancelInvitationButton({ invitationId }: { invitationId: string }) {
-  const [state, action] = useActionState(cancelInvitationAction, undefined);
-  useToastResult(state);
   return (
-    <form action={action}>
-      <input type="hidden" name="invitationId" value={invitationId} />
-      <SubmitButton variant="ghost" size="sm" pendingText="취소 중…">
-        취소
-      </SubmitButton>
-    </form>
+    <ActionButton action={cancelInvitationAction} fields={{ invitationId }} variant="ghost" size="sm" pendingText="취소 중…">
+      취소
+    </ActionButton>
   );
 }
 
 export function MemberControls({ userId, role }: { userId: string; role: MemberRole }) {
   const [roleState, roleAction] = useActionState(changeRoleAction, undefined);
-  const [removeState, removeAction] = useActionState(removeMemberAction, undefined);
   useToastResult(roleState);
-  useToastResult(removeState);
 
   return (
     <div className="flex items-center gap-2">
@@ -107,17 +100,15 @@ export function MemberControls({ userId, role }: { userId: string; role: MemberR
           <option value="manager">{ROLE_LABEL.manager}</option>
         </NativeSelect>
       </form>
-      <form
-        action={removeAction}
-        onSubmit={(e) => {
-          if (!confirm("이 구성원을 매장에서 내보낼까요?")) e.preventDefault();
-        }}
+      <ActionButton
+        action={removeMemberAction}
+        fields={{ userId }}
+        confirmMessage="이 구성원을 매장에서 내보낼까요?"
+        variant="destructive"
+        size="sm"
       >
-        <input type="hidden" name="userId" value={userId} />
-        <SubmitButton variant="destructive" size="sm" pendingText="처리 중…">
-          내보내기
-        </SubmitButton>
-      </form>
+        내보내기
+      </ActionButton>
     </div>
   );
 }
