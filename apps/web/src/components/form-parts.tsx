@@ -103,12 +103,21 @@ export function useToastResult(state: ActionState) {
 /**
  * 서버 액션을 쓰는 폼. `<form action>` 으로 넘기면 React가 제출 후 결과와 상관없이 입력칸을 비우므로,
  * 직접 제출해서 오류가 나도 입력값이 남게 한다. resetOnSuccess 면 성공했을 때만 초기값으로 되돌린다.
+ * toastResult 면 액션이 끝난 자리에서 바로 알림을 띄운다. 성공하면 폼이 화면에서 사라지는 곳(예: 입고 완료)은
+ * useToastResult 로는 결과와 함께 폼이 사라져 알림이 뜨지 않으므로 이것을 쓴다.
  */
 export function useFormAction(
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>,
-  { resetOnSuccess = false }: { resetOnSuccess?: boolean } = {},
+  { resetOnSuccess = false, toastResult = false }: { resetOnSuccess?: boolean; toastResult?: boolean } = {},
 ) {
-  const [state, dispatch, pending] = useActionState(action, undefined);
+  const [state, dispatch, pending] = useActionState(async (prev: ActionState, formData: FormData) => {
+    const result = await action(prev, formData);
+    if (toastResult) {
+      if (result?.error) toast.error(result.error);
+      else if (result?.message) toast.success(result.message);
+    }
+    return result;
+  }, undefined);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {

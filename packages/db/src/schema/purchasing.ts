@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, quantity, updatedAt } from "./_shared";
@@ -58,6 +59,8 @@ export const purchaseOrderLines = pgTable(
   },
   (t) => [
     index("purchase_order_lines_po_idx").on(t.purchaseOrderId),
+    /** 한 발주서에 같은 품목은 한 줄 (수량을 바꿔서 조정한다) */
+    uniqueIndex("purchase_order_lines_po_item_key").on(t.purchaseOrderId, t.itemId),
     check("purchase_order_lines_quantity_check", sql`${t.quantity} > 0`),
     check("purchase_order_lines_received_check", sql`${t.receivedQuantity} >= 0`),
   ],

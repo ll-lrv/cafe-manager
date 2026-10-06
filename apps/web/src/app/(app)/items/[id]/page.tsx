@@ -10,6 +10,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getItem, isItemInUse, listCategories } from "@/lib/api/catalog";
 import { getStockLevels, listLotLevels, listMovements } from "@/lib/api/stock";
+import { listSuppliers } from "@/lib/api/suppliers";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { storeToday, toLotView } from "@/lib/inventory";
 import { MovementList } from "../../stock/movement-list";
@@ -20,7 +21,11 @@ export const metadata: Metadata = { title: "품목 정보" };
 
 export default async function ItemPage({ params, searchParams }: PageProps<"/items/[id]">) {
   const [{ id }, { created }, store] = await Promise.all([params, searchParams, requireCurrentStore()]);
-  const [item, categories] = await Promise.all([getItem(store.storeId, id), listCategories(store.storeId)]);
+  const [item, categories, suppliers] = await Promise.all([
+    getItem(store.storeId, id),
+    listCategories(store.storeId),
+    listSuppliers(store.storeId),
+  ]);
   if (!item) notFound();
   const [inUse, stock, movements, lotLevels] = await Promise.all([
     isItemInUse(item.id),
@@ -130,7 +135,14 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
           {readOnly && <CardDescription>품목 정보는 사장과 매니저만 바꿀 수 있습니다.</CardDescription>}
         </CardHeader>
         <CardContent>
-          <ItemForm item={item} categories={categories} baseUnitLocked={inUse} readOnly={readOnly} />
+          <ItemForm
+            item={item}
+            categories={categories}
+            // 보관된 거래처라도 지금 지정돼 있으면 선택지에 남긴다.
+            suppliers={suppliers.filter((s) => !s.archivedAt || s.id === item.defaultSupplierId)}
+            baseUnitLocked={inUse}
+            readOnly={readOnly}
+          />
         </CardContent>
       </Card>
     </div>

@@ -2,6 +2,7 @@ import { can } from "@cafe/core";
 import type { Metadata } from "next";
 import { Card, CardContent } from "@/components/ui/card";
 import { listCategories } from "@/lib/api/catalog";
+import { listSuppliers } from "@/lib/api/suppliers";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { BackLink } from "../back-link";
 import { ItemForm } from "../item-forms";
@@ -13,7 +14,7 @@ export default async function NewItemPage() {
   if (!can(store.role, "catalog:manage")) {
     return <p className="text-sm text-muted-foreground">품목 추가는 사장과 매니저만 할 수 있습니다.</p>;
   }
-  const categories = await listCategories(store.storeId);
+  const [categories, suppliers] = await Promise.all([listCategories(store.storeId), listSuppliers(store.storeId)]);
 
   return (
     <div className="grid gap-6">
@@ -23,7 +24,7 @@ export default async function NewItemPage() {
       </div>
       <Card>
         <CardContent>
-          <ItemForm categories={categories} />
+          <ItemForm categories={categories} suppliers={suppliers.filter((s) => !s.archivedAt)} />
         </CardContent>
       </Card>
     </div>

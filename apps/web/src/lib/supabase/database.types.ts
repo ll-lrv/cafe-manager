@@ -623,6 +623,9 @@ isOneToOne: false
             "accept_invitation":
 { Args: { "p_token": string }; Returns: string
                            },
+"change_purchase_order_status":
+{ Args: { "p_order_id": string,"p_status": Database["public"]['Enums']["purchase_order_status"] }; Returns: Database["public"]['Enums']["purchase_order_status"]
+                           },
 "complete_stock_count":
 { Args: { "p_stock_count_id": string }; Returns: number
                            },
@@ -642,6 +645,9 @@ isOneToOne: false
                            },
 "is_store_member":
 { Args: { "p_store_id": string }; Returns: boolean
+                           },
+"receive_purchase_order":
+{ Args: { "p_lines": Json,"p_order_id": string }; Returns: Database["public"]['Enums']["purchase_order_status"]
                            },
 "record_sales":
 { Args: { "p_lines": Json,"p_sold_at"?: string }; Returns: number

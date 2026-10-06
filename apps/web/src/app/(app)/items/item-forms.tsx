@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { Category, Item, ItemUnitInfo } from "@/lib/api/catalog";
+import type { Supplier } from "@/lib/api/suppliers";
 import {
   addItemUnitAction,
   createItemAction,
@@ -65,19 +66,22 @@ function Checkbox({ id, name, defaultChecked, label, hint }: {
 // ---------------------------------------------------------------- 품목 정보
 
 function savedVersion(item: Item) {
-  const { name, categoryId, baseUnit, minStock, trackExpiry, barcode, memo } = item;
-  return JSON.stringify([name, categoryId, baseUnit, minStock, trackExpiry, barcode, memo]);
+  const { name, categoryId, defaultSupplierId, baseUnit, minStock, trackExpiry, barcode, memo } = item;
+  return JSON.stringify([name, categoryId, defaultSupplierId, baseUnit, minStock, trackExpiry, barcode, memo]);
 }
 
 export function ItemForm({
   item,
   categories,
+  suppliers,
   baseUnitLocked = false,
   readOnly = false,
 }: {
   /** 없으면 새 품목 만들기 */
   item?: Item;
   categories: Category[];
+  /** 기본 거래처 선택지 (보관 제외) */
+  suppliers: Pick<Supplier, "id" | "name">[];
   /** 입출고·레시피에 쓰인 품목은 기본 단위를 바꿀 수 없다. */
   baseUnitLocked?: boolean;
   readOnly?: boolean;
@@ -144,6 +148,16 @@ export function ItemForm({
             defaultValue={item?.minStock ?? 0}
             unit={BASE_UNIT_LABEL[baseUnit]}
           />
+        </Field>
+        <Field label="기본 거래처 (선택)" htmlFor="item-supplier" hint="발주서를 쓸 때 이 거래처의 부족 품목으로 추천합니다.">
+          <NativeSelect id="item-supplier" name="defaultSupplierId" defaultValue={item?.defaultSupplierId ?? ""}>
+            <option value="">없음</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </NativeSelect>
         </Field>
         <Field label="바코드 (선택)" htmlFor="item-barcode">
           <Input id="item-barcode" name="barcode" defaultValue={item?.barcode ?? ""} maxLength={50} />

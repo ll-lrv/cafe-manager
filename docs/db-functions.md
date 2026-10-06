@@ -128,6 +128,49 @@ NestJS에서는 `SalesService.cancel()` 에서 같은 트랜잭션으로 지우�
 - 센 시각·센 사람(`counted_at`, `counted_by`)은 트리거 `stock_count_lines_set_counted` 가 기록한다. 화면이 보낸 값을 믿지 않는다
 - 실사 취소: 사장·매니저가 `status` 를 `in_progress` → `cancelled` 로만 바꿀 수 있다 (`GRANT UPDATE (status)`, 정책 `stock_counts_cancel`). 완료 상태는 함수로만
 
+### `receive_purchase_order` — 발주 입고 처리
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261006044357_purchasing_functions.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/purchasing.ts` `receiveOrder()` |
+| NestJS 대응 | `PurchaseOrdersService.receive()` (예정) |
+| 권한 | 사장·매니저 (`purchase:manage`) |
+| 잠금 | 발주서 행 `FOR UPDATE` + 입고할 품목 `items` 행들을 id 순으로 `FOR UPDATE` |
+| 쓰는 테이블 | `stock_lots`(유통기한 품목), `stock_movements`(`receive`, `purchase_order_line_id` 연결, 메모 "발주 입고: 거래처"), `purchase_order_lines.received_quantity`·`unit_price`, `purchase_orders.status` |
+| core 대응 | `toBaseQuantity`, `toBaseUnitCost`, `derivePurchaseOrderStatus` |
+
+입력: `p_order_id`, `p_lines` = `[{"line_id", "quantity"(주문 단위, 이번에 들어온 양), "unit_price"(없으면 발주 단가), "expires_on"}]`
+반환: 바뀐 상태 (`partially_received` 또는 `received`)
+
+처리 순서
+1. 발주서 잠금 → 구성원·사장/매니저 → 상태가 `ordered`/`partially_received` 인지 (작성 중이면 "발주한 뒤에", 끝났으면 "이미 끝난")
+2. 입고할 품목 잠금 (id 순)
+3. 줄마다(수량 0 은 건너뜀): 보관 품목·유통기한·단가 검증 → 주문 단위 × factor = 기본 단위 → 유통기한 품목이면 로트 → `receive` 원장(원가 = 단가 / factor) → 입고 수량 누적, 단가를 바꿨으면 줄 단가도 갱신
+4. 모든 줄의 입고 수량 ≥ 주문 수량이면 `received`, 아니면 `partially_received`. 주문보다 많이 들어와도 기록한다
+
+### `change_purchase_order_status` — 발주 상태 변경
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261006044357_purchasing_functions.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/purchasing.ts` `changeOrderStatus()` |
+| NestJS 대응 | `PurchaseOrdersService.place()` / `revert()` / `cancel()` / `close()` |
+| 권한 | 사장·매니저 (`purchase:manage`) |
+| 잠금 | 발주서 행 `FOR UPDATE` |
+
+허용 전환 (그 밖은 "지금 상태에서는 할 수 없는 작업입니다")
+- `draft → ordered` (줄이 하나 이상, `ordered_at` 기록) · `draft → cancelled`
+- `ordered → draft` (되돌리기, `ordered_at` 지움) · `ordered → cancelled`
+- `partially_received → received` (남은 수량 없이 마감)
+- 입고에 따른 `ordered → partially_received → received` 는 `receive_purchase_order` 만 정한다
+
+함께 바뀐 권한 (발주서·줄 편집은 함수가 아닌 일반 API — 한 행씩이거나 한 INSERT 문이라 원자적)
+- `purchase_orders`: 사장·매니저가 작성 중으로 만들고(`status = draft` 만), `expected_on`·`memo`·`supplier_id` 만 수정 (컬럼 권한). 상태·발주 시각은 함수로만
+- `purchase_order_lines`: **작성 중인 발주서에서만** 넣고·고치고·뺀다. 품목은 같은 매장, 단위는 그 품목의 것(정책 `purchase_order_lines_draft_write`). `received_quantity` 는 함수로만 (컬럼 권한)
+- 한 발주서에 같은 품목은 한 줄 (`purchase_order_lines_po_item_key`)
+- 부족 품목 담기: `apps/web/src/lib/order-suggestions.ts` + core `suggestOrderQuantity`(부족 기준 × 2 까지, 주문 단위로 올림). 여러 줄을 **한 번의 INSERT** 로 넣는다
+
 ### `stock_outflow` — 재고 꺼내기 (내부 전용)
 
 | | |
@@ -177,6 +220,7 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 | `on_auth_user_created` → `handle_new_user()` | `..._supabase_auth_rls.sql` | 가입하면 `profiles` 행 생성 | 가입 API에서 직접 생성 (Supabase Auth를 계속 쓰면 유지) |
 | `*_set_updated_at` → `set_updated_at()` | `..._catalog_triggers.sql` | items, suppliers, menus, purchase_orders 수정 시 `updated_at` 갱신 | **유지 권장.** Drizzle `$onUpdate` 만으로는 SQL 직접 수정 시 갱신되지 않는다 |
 | `items_prevent_base_unit_change` | `..._catalog_triggers.sql` | 입출고·레시피에 쓰인 품목의 기본 단위 변경 차단 | **유지 권장** (데이터 무결성 규칙). 서비스에서도 같은 확인을 해서 친절한 오류를 먼저 낸다 |
+| `stock_count_lines_set_counted` → `set_stock_count_line_counted()` | `..._stock_count_functions.sql` | 센 수량이 바뀌면 센 시각·센 사람 기록 (지우면 둘 다 null) | 서비스에서 같은 값을 직접 기록하거나 트리거 유지 |
 
 ## Supabase 전용 기능 (DB 함수 외)
 
@@ -190,6 +234,6 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 
 | 함수 | 하는 일 | core 대응 |
 |---|---|---|
-| 발주 입고 처리 | 발주 줄의 입고 수량 갱신 + `receive` 원장 + 발주 상태 갱신 | `purchasing.ts` |
+| POS/CSV 판매 가져오기 | `record_sales` 를 `source = 'pos'/'csv'`, `external_id` 로 중복 방지하며 호출 | `saleDeductions` |
 
 새 함수를 만들면 이 문서에 같은 형식으로 추가한다.

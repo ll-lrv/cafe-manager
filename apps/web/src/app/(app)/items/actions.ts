@@ -41,6 +41,7 @@ function readItemInput(formData: FormData): ItemInput {
   return {
     name: text(formData, "name"),
     categoryId: text(formData, "categoryId") || null,
+    defaultSupplierId: text(formData, "defaultSupplierId") || null,
     baseUnit: text(formData, "baseUnit") as BaseUnit,
     minStock: number(formData, "minStock", 0),
     trackExpiry: formData.get("trackExpiry") === "on",

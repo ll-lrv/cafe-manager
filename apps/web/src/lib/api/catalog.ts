@@ -22,6 +22,8 @@ export interface Item {
   name: string;
   categoryId: string | null;
   categoryName: string | null;
+  /** 주로 주문하는 거래처 (발주 때 부족 품목 추천에 쓴다) */
+  defaultSupplierId: string | null;
   baseUnit: BaseUnit;
   minStock: number;
   trackExpiry: boolean;
@@ -34,6 +36,7 @@ export interface Item {
 export interface ItemInput {
   name: string;
   categoryId: string | null;
+  defaultSupplierId: string | null;
   baseUnit: BaseUnit;
   minStock: number;
   trackExpiry: boolean;
@@ -48,12 +51,13 @@ export interface ItemUnitInput {
 }
 
 const ITEM_SELECT =
-  "id, name, category_id, base_unit, min_stock, track_expiry, barcode, memo, archived_at, category:categories(name), units:item_units(id, name, factor, is_default_purchase)";
+  "id, name, category_id, default_supplier_id, base_unit, min_stock, track_expiry, barcode, memo, archived_at, category:categories(name), units:item_units(id, name, factor, is_default_purchase)";
 
 type ItemRow = {
   id: string;
   name: string;
   category_id: string | null;
+  default_supplier_id: string | null;
   base_unit: BaseUnit;
   min_stock: number;
   track_expiry: boolean;
@@ -70,6 +74,7 @@ function toItem(row: ItemRow): Item {
     name: row.name,
     categoryId: row.category_id,
     categoryName: row.category?.name ?? null,
+    defaultSupplierId: row.default_supplier_id,
     baseUnit: row.base_unit,
     minStock: row.min_stock,
     trackExpiry: row.track_expiry,
@@ -116,6 +121,7 @@ function validateItemInput(input: ItemInput) {
   return {
     name: requireText(input.name, "품목 이름", 50),
     category_id: input.categoryId || null,
+    default_supplier_id: input.defaultSupplierId || null,
     base_unit: input.baseUnit,
     min_stock: roundQty(input.minStock),
     track_expiry: input.trackExpiry,

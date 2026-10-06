@@ -1,25 +1,23 @@
 import { can, EXPIRY_SOON_DAYS, formatQuantity } from "@cafe/core";
-import { ArrowRightLeft, ClipboardList, Receipt, Truck } from "lucide-react";
+import { ArrowRightLeft, ClipboardList, Receipt } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ExpiryBadge, StockStatusBadge } from "@/components/stock-badges";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listItems } from "@/lib/api/catalog";
 import { listStockCounts } from "@/lib/api/counts";
+import { listPurchaseOrders } from "@/lib/api/purchasing";
 import { listSales } from "@/lib/api/sales";
 import { getStockLevels, listLotLevels, listMovements } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { requireUser } from "@/lib/api/session";
 import { buildItemLevels, storeDayRange, storeToday, toLotView } from "@/lib/inventory";
+import { dayLabel } from "../orders/status";
 import { MovementList } from "../stock/movement-list";
 
 export const metadata: Metadata = { title: "대시보드" };
 
-const UPCOMING = [
-  { icon: Truck, title: "거래처·발주", description: "발주서 작성, 입고 처리" },
-];
 
 /** 대시보드 목록은 이 개수까지만 보여주고 나머지는 "모두 보기"로 */
 const LIMIT = 6;
@@ -36,14 +34,18 @@ function MoreLink({ href, total }: { href: string; total: number }) {
 export default async function DashboardPage() {
   const [user, store] = await Promise.all([requireUser(), requireCurrentStore()]);
   const today = storeToday();
-  const [items, stock, lotLevels, movements, todaySales, counts] = await Promise.all([
+  const canPurchase = can(store.role, "purchase:manage");
+  const [items, stock, lotLevels, movements, todaySales, counts, incoming] = await Promise.all([
     listItems(store.storeId),
     getStockLevels(store.storeId),
     listLotLevels(store.storeId),
     listMovements(store.storeId, { limit: 5 }),
     listSales(store.storeId, storeDayRange(today)),
     listStockCounts(store.storeId, 1),
+    canPurchase ? listPurchaseOrders(store.storeId, { statuses: ["ordered", "partially_received"] }) : Promise.resolve([]),
   ]);
+  // 입고 예정일 순 (없으면 뒤로)
+  const incomingSorted = [...incoming].sort((a, b) => (a.expectedOn ?? "9999").localeCompare(b.expectedOn ?? "9999"));
   const countInProgress = counts.find((c) => c.status === "in_progress");
   const todayCount = todaySales.reduce((sum, s) => sum + s.quantity, 0);
   const todayAmount = todaySales.reduce((sum, s) => sum + s.amount, 0);
@@ -188,6 +190,39 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
+          {canPurchase && incomingSorted.length > 0 && (
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>입고 예정 {incomingSorted.length}건</CardTitle>
+                <CardAction>
+                  <Link href="/orders" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    발주 보기
+                  </Link>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <ul className="divide-y">
+                  {incomingSorted.slice(0, LIMIT).map((o) => (
+                    <li key={o.id}>
+                      <Link href={`/orders/${o.id}`} className="flex items-center gap-2 py-2 text-sm hover:underline">
+                        <span className="font-medium">{o.supplierName}</span>
+                        <span className="min-w-0 truncate text-muted-foreground">
+                          {o.lines.map((l) => l.itemName).join(", ")}
+                        </span>
+                        <span
+                          className={`ml-auto shrink-0 tabular-nums ${o.expectedOn && o.expectedOn < today ? "text-destructive" : "text-muted-foreground"}`}
+                        >
+                          {o.expectedOn ? dayLabel(o.expectedOn) : "날짜 미정"}
+                          {o.status === "partially_received" && " · 일부 입고"}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>최근 기록</CardTitle>
@@ -204,25 +239,6 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <section className="grid gap-3">
-        <h2 className="text-sm font-medium text-muted-foreground">곧 추가될 기능</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {UPCOMING.map(({ icon: Icon, title, description }) => (
-            <Card key={title} size="sm">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Icon className="size-4 text-primary" />
-                  <CardTitle>{title}</CardTitle>
-                  <Badge variant="outline" className="ml-auto">
-                    준비 중
-                  </Badge>
-                </div>
-                <CardDescription>{description}</CardDescription>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

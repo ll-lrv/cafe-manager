@@ -12,10 +12,12 @@ import {
   formatQuantity,
   fromBaseQuantity,
   mergeDeltas,
+  orderTotal,
   recipeCost,
   roundQty,
   saleDeductions,
   stockStatus,
+  suggestOrderQuantity,
   toBaseQuantity,
   toBaseUnitCost,
 } from "./index";
@@ -139,6 +141,17 @@ describe("purchasing", () => {
     expect(derivePurchaseOrderStatus("cancelled", [{ quantity: 1, receivedQuantity: 1 }])).toBe(
       "cancelled",
     );
+  });
+
+  it("부족 알림 기준의 2배까지 채우는 양을 주문 단위로 올림한다", () => {
+    expect(suggestOrderQuantity(500, 2000, 1000)).toBe(4);
+    expect(suggestOrderQuantity(-300, 2000, 1000)).toBe(4);
+    expect(suggestOrderQuantity(0, 0, 1000)).toBe(1);
+    expect(suggestOrderQuantity(45, 50, 1)).toBe(55);
+  });
+
+  it("발주 금액은 단가가 있는 줄만 더한다", () => {
+    expect(orderTotal([{ quantity: 3, unitPrice: 24000 }, { quantity: 10, unitPrice: null }, { quantity: 0.5, unitPrice: 3000 }])).toBe(73500);
   });
 });
 

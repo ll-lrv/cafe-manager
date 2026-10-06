@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "purchase_order_lines_po_item_key" ON "purchase_order_lines" USING btree ("purchase_order_id","item_id");

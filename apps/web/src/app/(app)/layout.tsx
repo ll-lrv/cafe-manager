@@ -20,6 +20,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     { href: "/menus", label: "메뉴" },
     { href: "/counts", label: "실사" },
   ];
+  if (can(store.role, "purchase:manage")) nav.push({ href: "/orders", label: "발주" });
   if (can(store.role, "member:manage")) nav.push({ href: "/settings/members", label: "직원 관리" });
 
   return (
