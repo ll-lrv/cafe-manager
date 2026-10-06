@@ -1,0 +1,20 @@
+{
+  "name": "@cafe/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "브라우저 E2E 시나리오 (로컬 Supabase + pnpm dev 가 떠 있어야 한다)",
+  "scripts": {
+    "e2e": "node run-all.mjs",
+    "e2e:auth": "node auth.mjs",
+    "e2e:items": "node items.mjs",
+    "e2e:stock": "node stock.mjs",
+    "e2e:inventory": "node inventory.mjs",
+    "e2e:sales": "node sales.mjs",
+    "e2e:counts": "node counts.mjs",
+    "e2e:orders": "node orders.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}

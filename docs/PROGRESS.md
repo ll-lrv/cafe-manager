@@ -106,7 +106,7 @@
 재고관리 MVP(품목·입출고·재고 현황·메뉴/판매·실사·발주)는 끝났다. 다음 단계 후보:
 
 1. **MVP 다듬기**
-   - E2E 테스트를 저장소에 Playwright 테스트로 추가 (지금은 세션 임시 스크립트 6개, 197개 항목으로 확인함)
+   - E2E 를 `@playwright/test` 로 정식 전환 (지금은 `e2e/` 의 Node 스크립트 7개, 216개 항목, `pnpm e2e`)
    - 로그인·매장 만들기·직원 초대 폼도 `useFormAction` 으로 바꿔 오류 시 입력값 유지
    - `@cafe/core`, `@cafe/db` 에 lint 스크립트 추가
    - 매장 시간대를 설정으로 (지금은 Asia/Seoul 고정, `lib/inventory.ts`)

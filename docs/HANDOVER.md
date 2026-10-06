@@ -66,6 +66,7 @@ pnpm dev                   # http://localhost:3000
 | 명령 | 하는 일 |
 |---|---|
 | `pnpm dev` / `pnpm typecheck` / `pnpm lint` / `pnpm test` | 개발 서버 / 타입 검사 / lint / core 단위 테스트 |
+| `pnpm e2e` | 브라우저 E2E 전체 (Supabase + `pnpm dev` 가 떠 있어야 함, `e2e/README.md`) |
 | `pnpm db:generate --name <이름>` | `packages/db` 스키마 변경 → 마이그레이션 SQL 생성 |
 | `cd packages/db && npx drizzle-kit generate --custom --name <이름>` | 함수·RLS 등 Supabase 전용 SQL 용 빈 마이그레이션 |
 | `npx supabase migration up` | 새 마이그레이션 적용 |
@@ -88,6 +89,7 @@ apps/web                Next.js 16 (App Router)
 packages/core           순수 TS 비즈니스 로직 + 단위 테스트 (DB·프레임워크 의존 금지)
 packages/db             Drizzle 스키마 (스키마 변경은 반드시 여기서)
 supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL
+e2e/                    브라우저 E2E 시나리오 7개 (playwright-core + 설치된 Chrome)
 docs/                   이 문서, PROGRESS, db-functions
 ```
 
@@ -229,9 +231,10 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | core 단위 테스트 (vitest) | 21개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`, `pnpm lint` 통과. 단 lint 는 `apps/web` 만 (core·db 에 lint 스크립트 없음) |
 | DB 함수 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
-| 브라우저 E2E | 6개 시나리오, 197개 항목 통과 (품목 49, 입출고 28, 재고 현황 20, 판매 36, 실사 23, 발주 41) |
+| 브라우저 E2E | `e2e/` 7개 시나리오, **216개 항목 통과** (가입·초대 19, 품목 49, 입출고 28, 재고 현황 20, 판매 36, 실사 23, 발주 41). `pnpm e2e` |
 
-**주의: 브라우저 E2E는 저장소에 없다.** 작업 세션의 임시 폴더에 있는 Playwright(playwright-core + 설치된 Chrome) 스크립트로 돌렸고, 그 폴더는 세션이 끝나면 사라질 수 있다. 저장소에 Playwright 테스트로 옮기는 것이 다음 할 일 1순위다 (§10).
+브라우저 E2E는 `playwright-core` 로 설치된 Chrome 을 직접 조작하는 Node 스크립트다 (`@playwright/test` 아님). 실행 방법·시나리오 설명은 `e2e/README.md`.
+실행할 때마다 새 계정·매장을 만들어 로컬 DB에 테스트 데이터가 쌓인다. CI에는 아직 연결하지 않았다.
 E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스크린샷이 넣는 스타일 때문이다. 앱 문제가 아니다.
 
 ---
@@ -239,7 +242,8 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 ## 10. 앞으로 해야 할 일 (권장 순서)
 
 ### 1) MVP 다듬기 — 먼저 하길 권장
-- [ ] **E2E 테스트를 저장소에 추가** (`@playwright/test`). 시나리오: 가입·매장·초대 / 품목 / 입출고 / 재고 현황·실시간 / 메뉴·판매 / 실사 / 발주. 테스트용 DB 초기화 방법(`db:reset` 또는 테스트마다 새 매장)도 정한다
+- [x] E2E 스크립트를 저장소 `e2e/` 로 옮김 (`pnpm e2e`, 216개 항목)
+- [ ] E2E 를 `@playwright/test` 로 정식 전환: 중복된 도우미(가입, 품목·메뉴 만들기, 초대)를 공통 fixture 로, 리포트·재시도·병렬 실행. 테스트 데이터 정리 방법(전용 DB 또는 실행 후 정리)과 CI 연결도 정한다
 - [ ] 로그인·매장 만들기·직원 초대 폼을 `useFormAction` 으로 (오류 시 입력값 유지)
 - [ ] `@cafe/core`, `@cafe/db` 에 lint 스크립트
 - [ ] `pnpm db:reset` 으로 마이그레이션 13개를 처음부터 적용해 확인 (로컬 테스트 계정은 지워진다)
@@ -268,8 +272,9 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 ## 11. 알려진 제한
 
 - 배포·원격 저장소 없음 (로컬 전용)
-- 브라우저 E2E가 저장소에 없음 (§9)
+- 브라우저 E2E는 저장소에 있지만(`e2e/`) CI 미연결, 실행마다 테스트 데이터가 쌓임 (§9)
 - 판매 취소는 다른 기기 화면에 즉시 반영되지 않음 (다음 변경 때 반영)
 - 한 트랜잭션 안에서 입고를 두 번 하면 "최근 입고 단가"가 같은 시각이라 어느 쪽인지 정해지지 않는다 (실제 사용에서는 기록마다 시각이 달라 문제없음)
 - 실사로 늘어난 양은 유통기한 정보 없이 기록된다 (품목 상세에 "유통기한 기록 없음"으로 표시). 입출고 화면의 "조정 → 늘리기"는 유통기한을 넣을 수 있다
 - 리포트·매장 설정 화면 없음
+- 삭제·상태 변경 버튼(`ActionButton`)의 알림이 화면 갱신보다 아주 조금 먼저 뜬다. 사용에는 문제없지만, E2E 에서 알림 직후 화면을 읽으면 실패할 수 있어 결과 문구가 나타날 때까지 기다린다

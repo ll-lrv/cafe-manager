@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "e2e": "pnpm --filter @cafe/e2e e2e",
     "db:generate": "pnpm --filter @cafe/db generate",
     "db:migrate": "npx supabase db push",
     "db:reset": "npx supabase db reset",
