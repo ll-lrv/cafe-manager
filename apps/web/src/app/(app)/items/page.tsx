@@ -4,22 +4,31 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { listCategories, listItems } from "@/lib/api/catalog";
+import { getStockLevels, listLotLevels } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
-import { ItemList } from "./item-forms";
+import { buildItemLevels, storeToday } from "@/lib/inventory";
+import { ItemList, type StatusFilter } from "./item-list";
 
-export const metadata: Metadata = { title: "품목" };
+export const metadata: Metadata = { title: "품목·재고" };
 
-export default async function ItemsPage() {
-  const store = await requireCurrentStore();
-  const [items, categories] = await Promise.all([listItems(store.storeId), listCategories(store.storeId)]);
+export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
+  const [{ status }, store] = await Promise.all([searchParams, requireCurrentStore()]);
+  const [items, categories, stock, lots] = await Promise.all([
+    listItems(store.storeId),
+    listCategories(store.storeId),
+    getStockLevels(store.storeId),
+    listLotLevels(store.storeId),
+  ]);
+  const levels = buildItemLevels(items, stock, lots, storeToday());
+  const initialStatus: StatusFilter = status === "low" || status === "expiry" ? status : "all";
   const canManage = can(store.role, "catalog:manage");
 
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <h1 className="text-xl font-bold">품목</h1>
-          <p className="text-sm text-muted-foreground">원두, 우유, 컵처럼 재고로 관리하는 물품입니다.</p>
+          <h1 className="text-xl font-bold">품목·재고</h1>
+          <p className="text-sm text-muted-foreground">원두, 우유, 컵처럼 재고로 관리하는 물품과 현재 재고입니다.</p>
         </div>
         {canManage && (
           <div className="flex gap-2">
@@ -34,7 +43,8 @@ export default async function ItemsPage() {
           </div>
         )}
       </div>
-      <ItemList items={items} categories={categories} />
+      {/* 대시보드에서 상태 필터를 바꿔 들어오면 그 상태로 다시 시작한다. */}
+      <ItemList key={initialStatus} items={items} categories={categories} levels={levels} initialStatus={initialStatus} />
     </div>
   );
 }

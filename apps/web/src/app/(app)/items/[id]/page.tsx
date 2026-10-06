@@ -1,15 +1,17 @@
-import { can, formatQuantity } from "@cafe/core";
+import { can, formatQuantity, roundQty, stockStatus } from "@cafe/core";
 import { ArrowRightLeft, CircleCheck } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ExpiryBadge, StockStatusBadge } from "@/components/stock-badges";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getItem, isItemInUse, listCategories } from "@/lib/api/catalog";
-import { getStockLevels, listMovements } from "@/lib/api/stock";
+import { getStockLevels, listLotLevels, listMovements } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
+import { storeToday, toLotView } from "@/lib/inventory";
 import { MovementList } from "../../stock/movement-list";
 import { BackLink } from "../back-link";
 import { ArchiveItemButton, ItemForm, UnitsEditor } from "../item-forms";
@@ -20,13 +22,19 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
   const [{ id }, { created }, store] = await Promise.all([params, searchParams, requireCurrentStore()]);
   const [item, categories] = await Promise.all([getItem(store.storeId, id), listCategories(store.storeId)]);
   if (!item) notFound();
-  const [inUse, stock, movements] = await Promise.all([
+  const [inUse, stock, movements, lotLevels] = await Promise.all([
     isItemInUse(item.id),
     getStockLevels(store.storeId),
     listMovements(store.storeId, { itemId: item.id, limit: 10 }),
+    item.trackExpiry ? listLotLevels(store.storeId, { itemId: item.id }) : Promise.resolve([]),
   ]);
   const quantity = stock[item.id] ?? 0;
   const defaultUnit = item.units.find((u) => u.isDefaultPurchase) ?? null;
+  const fmt = (n: number) => formatQuantity(n, item.baseUnit, defaultUnit);
+  const today = storeToday();
+  const lots = lotLevels.map((l) => toLotView(l, today));
+  // 로트 없이 들어오고 나간 양 (유통기한 관리를 나중에 켰거나, 로트보다 많이 쓴 경우)
+  const withoutLot = roundQty(quantity - lots.reduce((sum, l) => sum + l.quantity, 0));
 
   const readOnly = !can(store.role, "catalog:manage");
 
@@ -60,13 +68,12 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
           <CardHeader>
             <CardDescription>현재 재고</CardDescription>
             <CardTitle className="text-2xl font-bold">
-              {formatQuantity(quantity, item.baseUnit, defaultUnit)}
-              {quantity <= item.minStock && (
-                <Badge variant="destructive" className="ml-2 align-middle">
-                  부족
-                </Badge>
-              )}
+              <span className="mr-2">{fmt(quantity)}</span>
+              <span className="inline-flex align-middle">
+                <StockStatusBadge status={stockStatus(quantity, item.minStock)} />
+              </span>
             </CardTitle>
+            {item.minStock > 0 && <CardDescription>부족 기준 {fmt(item.minStock)}</CardDescription>}
             <CardAction>
               <Link href={`/stock?item=${item.id}`} className={buttonVariants()}>
                 <ArrowRightLeft />
@@ -74,10 +81,30 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
               </Link>
             </CardAction>
           </CardHeader>
-          <CardContent>
+          <CardContent className="grid gap-4">
+            {item.trackExpiry && (lots.length > 0 || withoutLot !== 0) && (
+              <section className="grid gap-2 rounded-lg bg-muted/50 p-3">
+                <h2 className="text-sm font-medium">유통기한별 남은 양</h2>
+                <ul className="grid gap-1.5 text-sm">
+                  {lots.map((lot) => (
+                    <li key={lot.lotId} className="flex flex-wrap items-center gap-2">
+                      <span className="tabular-nums">{lot.expiresOn ?? "유통기한 없음"}</span>
+                      <ExpiryBadge status={lot.expiry} daysLeft={lot.daysLeft} />
+                      <span className="ml-auto font-medium tabular-nums">{fmt(lot.quantity)}</span>
+                    </li>
+                  ))}
+                  {withoutLot !== 0 && (
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <span>유통기한 기록 없음</span>
+                      <span className="ml-auto tabular-nums">{fmt(withoutLot)}</span>
+                    </li>
+                  )}
+                </ul>
+              </section>
+            )}
             <MovementList movements={movements} showItem={false} />
             {movements.length === 10 && (
-              <Link href={`/stock?item=${item.id}`} className="mt-2 block text-sm text-muted-foreground hover:underline">
+              <Link href={`/stock?item=${item.id}`} className="block text-sm text-muted-foreground hover:underline">
                 기록 더 보기
               </Link>
             )}

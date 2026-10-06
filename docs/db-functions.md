@@ -90,6 +90,14 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 | `*_set_updated_at` → `set_updated_at()` | `..._catalog_triggers.sql` | items, suppliers, menus, purchase_orders 수정 시 `updated_at` 갱신 | **유지 권장.** Drizzle `$onUpdate` 만으로는 SQL 직접 수정 시 갱신되지 않는다 |
 | `items_prevent_base_unit_change` | `..._catalog_triggers.sql` | 입출고·레시피에 쓰인 품목의 기본 단위 변경 차단 | **유지 권장** (데이터 무결성 규칙). 서비스에서도 같은 확인을 해서 친절한 오류를 먼저 낸다 |
 
+## Supabase 전용 기능 (DB 함수 외)
+
+| 기능 | 위치 | 하는 일 | NestJS 전환 시 |
+|---|---|---|---|
+| Realtime 구독 | `apps/web/src/lib/api/realtime.ts` `subscribeStoreChanges()` → `components/realtime-refresh.tsx` | `stock_movements`, `items` 변경(내 매장, RLS 적용)을 받아 화면을 새로고침 | 원장 기록·품목 변경 후 서비스가 이벤트를 내고, WebSocket/SSE 게이트웨이로 매장별 방송. `subscribeStoreChanges` 의 시그니처(매장 ID, 콜백 → 구독 해제 함수)는 그대로 두고 안만 바꾼다 |
+| 구독 대상 테이블 | `..._supabase_auth_rls.sql` 끝의 `ALTER PUBLICATION supabase_realtime` | 위 두 테이블만 방송 | 게이트웨이로 옮기면 publication 에서 뺀다 |
+| 재고 집계 뷰 | `item_stock_levels`, `lot_stock_levels` (Drizzle 스키마 `inventory.ts`) | 원장 합계로 현재 재고·로트 잔량 계산 | 뷰는 그대로 쓴다 (PostgreSQL 뷰, `security_invoker`) |
+
 ## 앞으로 추가할 함수 (예정)
 
 | 함수 | 하는 일 | core 대응 |

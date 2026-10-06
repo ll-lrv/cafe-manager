@@ -3,13 +3,17 @@ import {
   allocateFifo,
   can,
   countAdjustments,
+  dateInTimeZone,
   daysUntilExpiry,
+  expiryLabel,
+  expiryStatus,
   derivePurchaseOrderStatus,
   formatQuantity,
   fromBaseQuantity,
   mergeDeltas,
   roundQty,
   saleDeductions,
+  stockStatus,
   toBaseQuantity,
   toBaseUnitCost,
 } from "./index";
@@ -146,5 +150,33 @@ describe("permissions", () => {
     expect(can("manager", "member:manage")).toBe(false);
     expect(can("owner", "store:manage")).toBe(true);
     expect(can(null, "stock:move")).toBe(false);
+  });
+});
+
+describe("stock-status", () => {
+  it("재고 없음·부족·충분을 구분한다", () => {
+    expect(stockStatus(0, 0)).toBe("out");
+    expect(stockStatus(-100, 500)).toBe("out");
+    expect(stockStatus(500, 500)).toBe("low");
+    expect(stockStatus(501, 500)).toBe("ok");
+    expect(stockStatus(1, 0)).toBe("ok");
+  });
+
+  it("유통기한 지남·임박·충분을 구분하고 표시한다", () => {
+    expect(expiryStatus(-1)).toBe("expired");
+    expect(expiryStatus(0)).toBe("soon");
+    expect(expiryStatus(3)).toBe("soon");
+    expect(expiryStatus(4)).toBe("ok");
+    expect(expiryLabel(-2)).toBe("2일 지남");
+    expect(expiryLabel(0)).toBe("오늘까지");
+    expect(expiryLabel(5)).toBe("D-5");
+  });
+
+  it("시간대 기준 오늘 날짜로 남은 날을 센다", () => {
+    // 2026-10-06 23:30 UTC = 한국 10월 7일 08:30
+    const now = new Date(Date.UTC(2026, 9, 6, 23, 30));
+    expect(dateInTimeZone(now, "Asia/Seoul")).toBe("2026-10-07");
+    expect(daysUntilExpiry("2026-10-10", dateInTimeZone(now, "Asia/Seoul"))).toBe(3);
+    expect(daysUntilExpiry("2026-10-10", "2026-10-10")).toBe(0);
   });
 });

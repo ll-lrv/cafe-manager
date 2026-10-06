@@ -1,14 +1,12 @@
 "use client";
 
 import { BASE_UNIT_LABEL, formatQuantity, type BaseUnit } from "@cafe/core";
-import { Archive, ArchiveRestore, ChevronRight, Search, Star, Trash2 } from "lucide-react";
-import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { Archive, ArchiveRestore, Star, Trash2 } from "lucide-react";
+import { useActionState, useState } from "react";
 import { Field, FormMessage, NativeSelect, SubmitButton, useFormAction, useToastResult } from "@/components/form-parts";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { Category, Item, ItemUnitInfo } from "@/lib/api/catalog";
-import { cn } from "@/lib/utils";
 import {
   addItemUnitAction,
   createItemAction,
@@ -23,10 +21,6 @@ const BASE_UNIT_OPTIONS: { value: BaseUnit; label: string }[] = [
   { value: "ml", label: "ml (부피)" },
   { value: "ea", label: "개 (개수)" },
 ];
-
-function defaultUnit(units: ItemUnitInfo[]) {
-  return units.find((u) => u.isDefaultPurchase) ?? null;
-}
 
 /** 입력칸 오른쪽에 단위를 붙여 보여준다. */
 function UnitInput({ unit, ...props }: React.ComponentProps<typeof Input> & { unit: string }) {
@@ -56,119 +50,6 @@ function Checkbox({ id, name, defaultChecked, label, hint }: {
         </label>
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- 목록
-
-export function ItemList({ items, categories }: { items: Item[]; categories: Category[] }) {
-  const [query, setQuery] = useState("");
-  /** "all" | "none"(미분류) | 카테고리 ID */
-  const [categoryId, setCategoryId] = useState("all");
-  const [showArchived, setShowArchived] = useState(false);
-
-  const archivedCount = items.filter((i) => i.archivedAt).length;
-  const hasUncategorized = items.some((i) => !i.categoryId && !i.archivedAt);
-
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((item) => {
-      if (!showArchived && item.archivedAt) return false;
-      if (categoryId === "none" ? item.categoryId : categoryId !== "all" && item.categoryId !== categoryId) {
-        return false;
-      }
-      return !q || item.name.toLowerCase().includes(q) || item.barcode?.includes(q);
-    });
-  }, [items, query, categoryId, showArchived]);
-
-  const filters = [
-    { id: "all", name: "전체" },
-    ...categories,
-    ...(hasUncategorized ? [{ id: "none", name: "미분류" }] : []),
-  ];
-
-  return (
-    <div className="grid gap-3">
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="품목 이름 또는 바코드 검색"
-          aria-label="품목 검색"
-          className="pl-8"
-        />
-      </div>
-
-      <div className="flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="카테고리">
-        {filters.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => setCategoryId(f.id)}
-            aria-pressed={categoryId === f.id}
-            className={cn(
-              "shrink-0 rounded-full border px-3 py-1 text-sm transition-colors",
-              categoryId === f.id
-                ? "border-primary bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            {f.name}
-          </button>
-        ))}
-      </div>
-
-      {visible.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {items.length === 0 ? "아직 등록한 품목이 없습니다." : "조건에 맞는 품목이 없습니다."}
-        </p>
-      ) : (
-        <ul className="divide-y rounded-xl ring-1 ring-foreground/10">
-          {visible.map((item) => (
-            <li key={item.id}>
-              <Link
-                href={`/items/${item.id}`}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
-                  item.archivedAt && "opacity-60",
-                )}
-              >
-                <div className="grid min-w-0 flex-1 gap-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate font-medium">{item.name}</span>
-                    {item.categoryName && <Badge variant="secondary">{item.categoryName}</Badge>}
-                    {item.trackExpiry && <Badge variant="outline">유통기한</Badge>}
-                    {item.archivedAt && <Badge variant="outline">보관됨</Badge>}
-                  </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    기본 단위 {BASE_UNIT_LABEL[item.baseUnit]}
-                    {item.units.length > 0 &&
-                      ` · ${item.units.map((u) => `${u.name}(${formatQuantity(u.factor, item.baseUnit)})`).join(", ")}`}
-                    {item.minStock > 0 &&
-                      ` · 부족 기준 ${formatQuantity(item.minStock, item.baseUnit, defaultUnit(item.units))}`}
-                  </p>
-                </div>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {archivedCount > 0 && (
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => setShowArchived(e.target.checked)}
-            className="size-4 accent-primary"
-          />
-          보관된 품목도 보기 ({archivedCount}개)
-        </label>
-      )}
     </div>
   );
 }

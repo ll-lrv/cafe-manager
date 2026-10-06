@@ -47,10 +47,17 @@ export function allocateFifo(
   return { allocations, shortfall: remaining };
 }
 
-/** 오늘 기준 며칠 남았는지. 지났으면 음수 */
-export function daysUntilExpiry(expiresOn: string, today: Date = new Date()): number {
-  const [y, m, d] = expiresOn.split("-").map(Number) as [number, number, number];
-  const expiry = Date.UTC(y, m - 1, d);
-  const base = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((expiry - base) / 86_400_000);
+/** YYYY-MM-DD → UTC 자정 시각(ms) */
+function utcDay(ymd: string): number {
+  const [y, m, d] = ymd.split("-").map(Number) as [number, number, number];
+  return Date.UTC(y, m - 1, d);
+}
+
+/** 오늘 기준 며칠 남았는지. 지났으면 음수. today 는 Date(그 기기 시간대 날짜) 또는 YYYY-MM-DD */
+export function daysUntilExpiry(expiresOn: string, today: Date | string = new Date()): number {
+  const base =
+    typeof today === "string"
+      ? utcDay(today)
+      : Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((utcDay(expiresOn) - base) / 86_400_000);
 }

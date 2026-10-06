@@ -1,6 +1,7 @@
 import { can, ROLE_LABEL } from "@cafe/core";
 import { Coffee, LogOut } from "lucide-react";
 import Link from "next/link";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { requireCurrentStore } from "@/lib/api/stores";
@@ -14,7 +15,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const nav: NavItem[] = [
     { href: "/dashboard", label: "대시보드" },
     { href: "/stock", label: "입출고" },
-    { href: "/items", label: "품목" },
+    { href: "/items", label: "품목·재고" },
   ];
   if (can(store.role, "member:manage")) nav.push({ href: "/settings/members", label: "직원 관리" });
 
@@ -44,6 +45,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+      <RealtimeRefresh storeId={store.storeId} />
     </div>
   );
 }

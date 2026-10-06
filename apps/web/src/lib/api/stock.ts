@@ -132,3 +132,30 @@ export async function getStockLevels(storeId: string): Promise<Record<string, nu
   if (error) throw new ApiError(dbErrorMessage(error));
   return Object.fromEntries(data.flatMap((r) => (r.item_id ? [[r.item_id, r.quantity ?? 0]] : [])));
 }
+
+export interface LotLevel {
+  lotId: string;
+  itemId: string;
+  /** YYYY-MM-DD */
+  expiresOn: string | null;
+  /** 남은 수량 (기본 단위, 양수) */
+  quantity: number;
+}
+
+/** 남은 양이 있는 유통기한 로트. 기한이 빠른 순 (기한 없음은 맨 뒤) */
+export async function listLotLevels(storeId: string, { itemId }: { itemId?: string } = {}): Promise<LotLevel[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("lot_stock_levels")
+    .select("lot_id, item_id, expires_on, quantity")
+    .eq("store_id", storeId)
+    .order("expires_on", { ascending: true, nullsFirst: false });
+  if (itemId) query = query.eq("item_id", itemId);
+  const { data, error } = await query;
+  if (error) throw new ApiError(dbErrorMessage(error));
+  return data.flatMap((l) =>
+    l.lot_id && l.item_id
+      ? [{ lotId: l.lot_id, itemId: l.item_id, expiresOn: l.expires_on, quantity: l.quantity ?? 0 }]
+      : [],
+  );
+}

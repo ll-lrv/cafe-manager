@@ -5,3 +5,4 @@ export * from "./fifo";
 export * from "./stock-count";
 export * from "./purchasing";
 export * from "./permissions";
+export * from "./stock-status";
