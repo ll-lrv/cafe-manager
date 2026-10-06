@@ -2,6 +2,7 @@
 
 카페 운영 관리 앱. 재고관리 MVP → 매출(POS) 연동 → 분석 순으로 확장한다.
 Supabase로 MVP를 만들고, 이후 NestJS + PostgreSQL로 점진 전환할 계획이다.
+처음 이어받는다면 `docs/HANDOVER.md`(인수인계 문서)부터 읽는다.
 진행 상황, 다시 시작하는 방법, 다음 할 일은 `docs/PROGRESS.md` 에 있다. 작업을 마치면 이 파일을 갱신한다.
 
 ## 구조
