@@ -7,6 +7,8 @@ export type MemberRole = "owner" | "manager" | "staff";
 const PERMISSIONS = {
   /** 입고·사용·폐기 기록 */
   "stock:move": ["owner", "manager", "staff"],
+  /** 재고 직접 조정(± 수량). 잘못 기록한 입출고를 바로잡을 때 */
+  "stock:adjust": ["owner", "manager"],
   /** 실사 진행(수량 입력) */
   "stock:count": ["owner", "manager", "staff"],
   /** 실사 완료 → 재고 조정 확정 */

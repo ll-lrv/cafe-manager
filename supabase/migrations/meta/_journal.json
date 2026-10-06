@@ -36,6 +36,13 @@
       "when": 1791255378538,
       "tag": "20261006025618_catalog_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791256684990,
+      "tag": "20261006031804_record_stock_movement",
+      "breakpoints": true
     }
   ]
 }

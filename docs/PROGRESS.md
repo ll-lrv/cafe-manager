@@ -29,6 +29,16 @@
 - 루트 `db:*` 스크립트를 `npx supabase` 로 수정 (전역 supabase CLI 없이 동작)
 - 브라우저 E2E로 확인: 카테고리 CRUD·순서·중복 안내 → 품목 추가(쉼표 숫자) → 단위 추가·기본 변경·삭제·중복/0 거부 → 수정·updated_at → 중복 이름 시 입력값 유지 → 검색·필터 → 기본 단위 잠금(화면+DB 트리거) → 보관/복원 → 직원 보기 전용 → 404 → 모바일 레이아웃
 
+### 4. 입출고 기록 (DB 함수로 트랜잭션 처리)
+- **결정 (2026-10-06)**: 여러 행을 함께 쓰는 작업은 DB 함수로 묶는다. 함수 목록과 NestJS 전환 방법은 **`docs/db-functions.md`**
+- DB 함수 `record_stock_movement`: 단위 환산·단가 환산·로트 생성·유통기한 순(FIFO) 차감·원장 기록을 한 트랜잭션으로. 품목 행을 잠가 동시 기록에도 안전
+- `stock_movements`, `stock_lots` 직접 INSERT 정책 제거 → 함수로만 기록
+- 권한 `stock:adjust`(사장·매니저) 추가. 직원은 입고·사용·폐기만
+- 화면 `/stock`: 입고·사용·폐기·조정, 품목 선택(카테고리별), 단위 선택(입고는 기본 입고 단위), 현재 재고 → 기록 후 재고 미리보기, 마이너스 경고, 입고 단가·유통기한, 최근 기록 50건(`?item=` 으로 품목별)
+- 품목 상세: 현재 재고(부족 배지), 최근 기록 10건, "입출고 기록" 버튼
+- 데이터 접근 `apps/web/src/lib/api/stock.ts`
+- 확인: SQL로 함수 직접 검증(사장·직원·다른 매장 사용자, 로트 배분, 오류 문구, 직접 INSERT 차단) + 브라우저 E2E(입고→로트별 사용→마이너스 경고→조정→품목 상세→직원 기록→보관 품목 제외→모바일)
+
 ## 다시 시작하는 방법
 
 1. **Docker Desktop 실행** (`%LOCALAPPDATA%\Programs\DockerDesktop\Docker Desktop.exe`)
@@ -48,12 +58,10 @@
 
 ## 다음 할 일
 
-1. **입출고 기록**: 입고·사용·폐기 입력 (입고 단위로 입력 → 기본 단위로 환산, 기본 입고 단위를 처음 선택), 유통기한 품목은 로트 생성
-2. **재고 현황**: `item_stock_levels` 뷰 기반 목록(품목 목록에 현재 재고 표시), 부족 표시, Supabase Realtime으로 다른 기기에 즉시 반영
-3. 그다음: 메뉴·레시피 → 판매 입력(자동 차감) → 재고 실사 → 거래처·발주
-4. 정리 과제
+1. **재고 현황**: `item_stock_levels` 뷰 기반 목록(품목 목록에 현재 재고·부족 표시), 유통기한 임박 로트(`lot_stock_levels`, core `daysUntilExpiry`), 대시보드에 부족·임박 요약, Supabase Realtime으로 다른 기기에 즉시 반영
+2. 그다음: 메뉴·레시피 → 판매 입력(자동 차감) → 재고 실사 → 거래처·발주
+3. 정리 과제
    - E2E 테스트를 저장소에 Playwright 테스트로 추가 (지금은 임시 스크립트로만 확인함)
-   - 재고 차감처럼 여러 행을 함께 써야 하는 작업은 DB 함수(트랜잭션)로 처리할지 결정 (입출고 기록 전에 정할 것)
    - 로그인·매장 만들기·직원 초대 폼도 `useFormAction` 으로 바꿔 오류 시 입력값 유지
    - `@cafe/core`, `@cafe/db` 에는 lint 스크립트가 없다
 
@@ -61,3 +69,4 @@
 - 이 PC에는 다른 Supabase 프로젝트(`cafe-manager_simple`)와 `cafe-postgres` 컨테이너가 있다. Docker를 켜면 같이 켜진다. 건드리지 않았다.
 - Next.js 16: middleware → `src/proxy.ts`. 코드 작성 전 `apps/web/node_modules/next/dist/docs/` 확인
 - shadcn/ui 는 Base UI 기반(base-nova). `cn` 은 shadcn의 `cn` 패키지
+- E2E 중 hydration 경고(`caret-color: transparent`)가 보이면 Playwright 스크린샷이 넣는 스타일이다. 앱 문제 아님

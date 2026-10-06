@@ -577,6 +577,9 @@ isOneToOne: false
                            },
 "is_store_member":
 { Args: { "p_store_id": string }; Returns: boolean
+                           },
+"record_stock_movement":
+{ Args: { "p_expires_on"?: string,"p_item_id": string,"p_memo"?: string,"p_quantity": number,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id"?: string,"p_unit_price"?: number }; Returns: number
                            }
           }
           Enums: {
