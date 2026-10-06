@@ -18,6 +18,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     { href: "/stock", label: "입출고" },
     { href: "/items", label: "품목·재고" },
     { href: "/menus", label: "메뉴" },
+    { href: "/counts", label: "실사" },
   ];
   if (can(store.role, "member:manage")) nav.push({ href: "/settings/members", label: "직원 관리" });
 

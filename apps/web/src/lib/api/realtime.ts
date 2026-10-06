@@ -8,8 +8,29 @@ import { createClient } from "@/lib/supabase/client";
  * NestJS 전환 시: WebSocket/SSE 게이트웨이 구독으로 바꾼다. (docs/db-functions.md "Supabase 전용 기능")
  */
 export function subscribeStoreChanges(storeId: string, onChange: () => void): () => void {
-  const supabase = createClient();
   const filter = `store_id=eq.${storeId}`;
+  return subscribe(`store-changes:${storeId}`, (channel) =>
+    channel
+      .on("postgres_changes", { event: "*", schema: "public", table: "stock_movements", filter }, onChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "items", filter }, onChange)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "sale_records", filter }, onChange),
+  );
+}
+
+/** 진행 중인 실사에서 다른 사람이 센 수량을 입력하면 onChange 를 부른다. */
+export function subscribeStockCount(countId: string, onChange: () => void): () => void {
+  return subscribe(`stock-count:${countId}`, (channel) =>
+    channel.on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "stock_count_lines", filter: `stock_count_id=eq.${countId}` },
+      onChange,
+    ),
+  );
+}
+
+/** 로그인 토큰을 넣고 채널을 구독한다. 반환: 구독 해제 함수 */
+function subscribe(name: string, setup: (channel: RealtimeChannel) => RealtimeChannel): () => void {
+  const supabase = createClient();
   let channel: RealtimeChannel | null = null;
   let cancelled = false;
 
@@ -20,12 +41,7 @@ export function subscribeStoreChanges(storeId: string, onChange: () => void): ()
     if (cancelled || !data.session) return;
     await supabase.realtime.setAuth(data.session.access_token);
     if (cancelled) return;
-    channel = supabase
-      .channel(`store-changes:${storeId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "stock_movements", filter }, onChange)
-      .on("postgres_changes", { event: "*", schema: "public", table: "items", filter }, onChange)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "sale_records", filter }, onChange)
-      .subscribe();
+    channel = setup(supabase.channel(name)).subscribe();
   })();
 
   return () => {

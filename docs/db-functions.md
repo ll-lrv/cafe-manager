@@ -85,16 +85,59 @@ NestJS에서는 `SalesService.cancel()` 에서 같은 트랜잭션으로 지우�
 
 함께 바뀐 RLS: `sale_records` 의 INSERT 정책을 없앴다. 판매는 함수로만 기록한다.
 
+### `start_stock_count` — 재고 실사 시작
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261006043120_stock_count_functions.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/counts.ts` `startStockCount()` |
+| NestJS 대응 | `StockCountsService.start()` (예정) |
+| 권한 | 매장 구성원 (`stock:count`) |
+| 쓰는 테이블 | `stock_counts` 1행, `stock_count_lines` (보관 안 된 품목마다, 카테고리를 고르면 그 카테고리만) |
+
+매장당 진행 중인 실사는 하나(부분 유니크 인덱스 `stock_counts_one_in_progress_key` + 함수에서 먼저 확인해 친절한 오류).
+줄마다 시작 시점의 장부 재고를 `expected_quantity` 로 남긴다 (화면 표시용. 조정 계산에는 쓰지 않는다).
+
+### `complete_stock_count` — 재고 실사 완료
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261006043120_stock_count_functions.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/counts.ts` `completeStockCount()` |
+| NestJS 대응 | `StockCountsService.complete()` (예정) |
+| 권한 | 사장·매니저 (`stock:count:complete`) |
+| 잠금 | `stock_counts` 행 `FOR UPDATE` (두 번 완료 방지) + 센 품목 `items` 행들을 id 순으로 `FOR UPDATE` |
+| 쓰는 테이블 | `stock_count_lines.adjustment`, `stock_movements`(`adjust`, `stock_count_id` 연결), `stock_counts` 상태 |
+| core 대응 | `countAdjustments`, `allocateFifo` |
+| 내부 호출 | `stock_outflow` (줄이는 조정) |
+
+**조정량 = 센 수량 − 그 품목을 센 시각의 장부 재고** (`occurred_at <= counted_at` 인 원장 합계, 뷰 `stock_count_line_books` 와 같은 계산).
+시작 시점이나 완료 시점이 아니라 센 시각과 비교하므로, 세는 도중·센 뒤에 판매·입출고가 있어도 맞는다.
+예) 10시에 원두 90g 으로 셈(그때 장부 100g) → 11시에 5g 판매 → 완료: −10g 조정 → 장부 85g.
+
+처리 순서
+1. 실사 잠금 → 구성원·사장/매니저·진행 중인지·센 품목이 있는지
+2. 센 품목 잠금 (id 순)
+3. 센 품목마다 조정량 계산 → `adjustment` 기록 → 줄이면 `stock_outflow`(유통기한 순), 늘리면 로트 없이 `adjust` 1행 (유통기한을 모르므로)
+4. 세지 않은 품목은 건너뛴다 (`adjustment` null)
+5. 상태 `completed`, 완료 시각·완료한 사람
+
+함께 바뀐 권한 (NestJS에서는 서비스가 같은 규칙을 지킨다)
+- `stock_counts`, `stock_count_lines` 의 INSERT/DELETE 는 함수로만. 직접 쓰는 정책·권한을 없앴다
+- 구성원은 진행 중인 실사 줄의 **`counted_quantity` 컬럼만** 수정 가능 (`GRANT UPDATE (counted_quantity)`, 정책 `stock_count_lines_update`)
+- 센 시각·센 사람(`counted_at`, `counted_by`)은 트리거 `stock_count_lines_set_counted` 가 기록한다. 화면이 보낸 값을 믿지 않는다
+- 실사 취소: 사장·매니저가 `status` 를 `in_progress` → `cancelled` 로만 바꿀 수 있다 (`GRANT UPDATE (status)`, 정책 `stock_counts_cancel`). 완료 상태는 함수로만
+
 ### `stock_outflow` — 재고 꺼내기 (내부 전용)
 
 | | |
 |---|---|
 | 마이그레이션 | `supabase/migrations/20261006041140_record_sales.sql` |
-| 호출하는 곳 | `record_stock_movement`, `record_sales` (클라이언트 실행 권한 없음) |
+| 호출하는 곳 | `record_stock_movement`, `record_sales`, `complete_stock_count` (클라이언트 실행 권한 없음) |
 | NestJS 대응 | `StockService` 의 private 메서드. `allocateFifo` 결과대로 원장 행을 만든다 |
 | 전제 | 호출하는 쪽이 권한 확인과 품목 잠금을 먼저 한다 |
 
-입력: 품목, 종류, 꺼낼 양(기본 단위, 양수), 입력 단위·factor(원장의 entered 값용), 메모, 기록자, 발생 시각, 판매 ID
+입력: 품목, 종류, 꺼낼 양(기본 단위, 양수), 입력 단위·factor(원장의 entered 값용), 메모, 기록자, 발생 시각, 판매 ID, 실사 ID
 유통기한 품목이면 로트를 `유통기한 오름차순(없음은 맨 뒤) → 입고 시각 → id` 순으로 꺼내고, 모자라면 로트 없이 1행. 반환: 원장 행 수
 
 ### `create_store` — 매장 만들기
@@ -139,15 +182,14 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 
 | 기능 | 위치 | 하는 일 | NestJS 전환 시 |
 |---|---|---|---|
-| Realtime 구독 | `apps/web/src/lib/api/realtime.ts` `subscribeStoreChanges()` → `components/realtime-refresh.tsx` | `stock_movements`, `items` 변경과 `sale_records` 추가(내 매장, RLS 적용)를 받아 화면을 새로고침. 필터가 걸린 구독에는 삭제 이벤트가 오지 않는다 | 원장 기록·품목 변경 후 서비스가 이벤트를 내고, WebSocket/SSE 게이트웨이로 매장별 방송. `subscribeStoreChanges` 의 시그니처(매장 ID, 콜백 → 구독 해제 함수)는 그대로 두고 안만 바꾼다 |
-| 구독 대상 테이블 | `..._supabase_auth_rls.sql`, `..._record_sales.sql` 의 `ALTER PUBLICATION supabase_realtime` | stock_movements, items, sale_records 방송 | 게이트웨이로 옮기면 publication 에서 뺀다 |
-| 재고 집계 뷰 | `item_stock_levels`, `lot_stock_levels`, `item_latest_costs` (Drizzle 스키마 `inventory.ts`) | 원장 합계로 현재 재고·로트 잔량, 품목별 최근 입고 단가(메뉴 원가용) | 뷰는 그대로 쓴다 (PostgreSQL 뷰, `security_invoker`) |
+| Realtime 구독 | `apps/web/src/lib/api/realtime.ts` `subscribeStoreChanges()` → `components/realtime-refresh.tsx`, `subscribeStockCount()` → 실사 화면 | `stock_movements`, `items` 변경과 `sale_records` 추가(내 매장, RLS 적용)를 받아 화면을 새로고침. 필터가 걸린 구독에는 삭제 이벤트가 오지 않는다 | 원장 기록·품목 변경 후 서비스가 이벤트를 내고, WebSocket/SSE 게이트웨이로 매장별 방송. `subscribeStoreChanges` 의 시그니처(매장 ID, 콜백 → 구독 해제 함수)는 그대로 두고 안만 바꾼다 |
+| 구독 대상 테이블 | `..._supabase_auth_rls.sql`, `..._record_sales.sql`, `..._stock_count_realtime.sql` 의 `ALTER PUBLICATION supabase_realtime` | stock_movements, items, sale_records, stock_count_lines 방송 | 게이트웨이로 옮기면 publication 에서 뺀다 |
+| 재고 집계 뷰 | `item_stock_levels`, `lot_stock_levels`, `item_latest_costs` (`inventory.ts`), `stock_count_line_books` (`counts.ts`) | 원장 합계로 현재 재고·로트 잔량, 품목별 최근 입고 단가(메뉴 원가용), 실사 줄의 센 시각 장부 | 뷰는 그대로 쓴다 (PostgreSQL 뷰, `security_invoker`) |
 
 ## 앞으로 추가할 함수 (예정)
 
 | 함수 | 하는 일 | core 대응 |
 |---|---|---|
-| 실사 완료 | 실사 수량과 장부 차이만큼 `adjust` 원장 + 상태 `completed` | `stock-count.ts` |
 | 발주 입고 처리 | 발주 줄의 입고 수량 갱신 + `receive` 원장 + 발주 상태 갱신 | `purchasing.ts` |
 
 새 함수를 만들면 이 문서에 같은 형식으로 추가한다.

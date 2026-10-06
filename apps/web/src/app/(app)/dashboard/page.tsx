@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listItems } from "@/lib/api/catalog";
+import { listStockCounts } from "@/lib/api/counts";
 import { listSales } from "@/lib/api/sales";
 import { getStockLevels, listLotLevels, listMovements } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
@@ -17,7 +18,6 @@ import { MovementList } from "../stock/movement-list";
 export const metadata: Metadata = { title: "대시보드" };
 
 const UPCOMING = [
-  { icon: ClipboardList, title: "재고 실사", description: "실제 수량을 세서 장부와 맞추기" },
   { icon: Truck, title: "거래처·발주", description: "발주서 작성, 입고 처리" },
 ];
 
@@ -36,13 +36,15 @@ function MoreLink({ href, total }: { href: string; total: number }) {
 export default async function DashboardPage() {
   const [user, store] = await Promise.all([requireUser(), requireCurrentStore()]);
   const today = storeToday();
-  const [items, stock, lotLevels, movements, todaySales] = await Promise.all([
+  const [items, stock, lotLevels, movements, todaySales, counts] = await Promise.all([
     listItems(store.storeId),
     getStockLevels(store.storeId),
     listLotLevels(store.storeId),
     listMovements(store.storeId, { limit: 5 }),
     listSales(store.storeId, storeDayRange(today)),
+    listStockCounts(store.storeId, 1),
   ]);
+  const countInProgress = counts.find((c) => c.status === "in_progress");
   const todayCount = todaySales.reduce((sum, s) => sum + s.quantity, 0);
   const todayAmount = todaySales.reduce((sum, s) => sum + s.amount, 0);
 
@@ -82,6 +84,22 @@ export default async function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {countInProgress && (
+        <Link href={`/counts/${countInProgress.id}`} className="block">
+          <Card size="sm" className="transition-colors hover:bg-muted/50">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <ClipboardList className="size-4 text-primary" />
+                <CardTitle>재고 실사 진행 중</CardTitle>
+              </div>
+              <CardDescription>
+                {countInProgress.categoryName ?? "전체 품목"} · {countInProgress.countedCount}/{countInProgress.lineCount}개 셈
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      )}
 
       <Link href="/sales" className="block">
         <Card size="sm" className="transition-colors hover:bg-muted/50">

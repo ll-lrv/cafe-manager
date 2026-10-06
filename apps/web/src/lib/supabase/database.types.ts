@@ -262,16 +262,22 @@ isOneToOne: false
                   ]
                 },"stock_count_lines": {
                   Row: {
-                    "counted_quantity": number | null,"expected_quantity": number,"item_id": string,"stock_count_id": string
+                    "adjustment": number | null,"counted_at": string | null,"counted_by": string | null,"counted_quantity": number | null,"expected_quantity": number,"item_id": string,"stock_count_id": string
                   }
                   Insert: {
-                    "counted_quantity"?: number | null,"expected_quantity": number,"item_id": string,"stock_count_id": string
+                    "adjustment"?: number | null,"counted_at"?: string | null,"counted_by"?: string | null,"counted_quantity"?: number | null,"expected_quantity": number,"item_id": string,"stock_count_id": string
                   }
                   Update: {
-                    "counted_quantity"?: number | null,"expected_quantity"?: number,"item_id"?: string,"stock_count_id"?: string
+                    "adjustment"?: number | null,"counted_at"?: string | null,"counted_by"?: string | null,"counted_quantity"?: number | null,"expected_quantity"?: number,"item_id"?: string,"stock_count_id"?: string
                   }
                   Relationships: [
                     {
+      foreignKeyName: "stock_count_lines_counted_by_profiles_id_fk"
+      columns: ["counted_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "stock_count_lines_item_id_items_id_fk"
       columns: ["item_id"]
 isOneToOne: false
@@ -293,16 +299,22 @@ isOneToOne: false
                   ]
                 },"stock_counts": {
                   Row: {
-                    "completed_at": string | null,"completed_by": string | null,"created_at": string,"created_by": string | null,"id": string,"memo": string | null,"started_at": string,"status": Database["public"]['Enums']["stock_count_status"],"store_id": string
+                    "category_id": string | null,"completed_at": string | null,"completed_by": string | null,"created_at": string,"created_by": string | null,"id": string,"memo": string | null,"started_at": string,"status": Database["public"]['Enums']["stock_count_status"],"store_id": string
                   }
                   Insert: {
-                    "completed_at"?: string | null,"completed_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"memo"?: string | null,"started_at"?: string,"status"?: Database["public"]['Enums']["stock_count_status"],"store_id": string
+                    "category_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"memo"?: string | null,"started_at"?: string,"status"?: Database["public"]['Enums']["stock_count_status"],"store_id": string
                   }
                   Update: {
-                    "completed_at"?: string | null,"completed_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"memo"?: string | null,"started_at"?: string,"status"?: Database["public"]['Enums']["stock_count_status"],"store_id"?: string
+                    "category_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"memo"?: string | null,"started_at"?: string,"status"?: Database["public"]['Enums']["stock_count_status"],"store_id"?: string
                   }
                   Relationships: [
                     {
+      foreignKeyName: "stock_counts_category_id_categories_id_fk"
+      columns: ["category_id"]
+isOneToOne: false
+      referencedRelation: "categories"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "stock_counts_completed_by_profiles_id_fk"
       columns: ["completed_by"]
 isOneToOne: false
@@ -580,11 +592,39 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"stock_count_line_books": {
+                  Row: {
+                    "book_quantity": number | null,"item_id": string | null,"stock_count_id": string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stock_count_lines_item_id_items_id_fk"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "item_stock_levels"
+      referencedColumns: ["item_id"]
+    },{
+      foreignKeyName: "stock_count_lines_item_id_items_id_fk"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_count_lines_stock_count_id_stock_counts_id_fk"
+      columns: ["stock_count_id"]
+isOneToOne: false
+      referencedRelation: "stock_counts"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Functions: {
             "accept_invitation":
 { Args: { "p_token": string }; Returns: string
+                           },
+"complete_stock_count":
+{ Args: { "p_stock_count_id": string }; Returns: number
                            },
 "create_store":
 { Args: { "p_name": string }; Returns: string
@@ -609,8 +649,11 @@ isOneToOne: false
 "record_stock_movement":
 { Args: { "p_expires_on"?: string,"p_item_id": string,"p_memo"?: string,"p_quantity": number,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id"?: string,"p_unit_price"?: number }; Returns: number
                            },
+"start_stock_count":
+{ Args: { "p_category_id"?: string,"p_memo"?: string,"p_store_id": string }; Returns: string
+                           },
 "stock_outflow":
-{ Args: { "p_created_by": string,"p_factor": number,"p_item_id": string,"p_memo": string,"p_occurred_at": string,"p_quantity": number,"p_sale_record_id"?: string,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id": string }; Returns: number
+{ Args: { "p_created_by": string,"p_factor": number,"p_item_id": string,"p_memo": string,"p_occurred_at": string,"p_quantity": number,"p_sale_record_id"?: string,"p_stock_count_id"?: string,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id": string }; Returns: number
                            }
           }
           Enums: {

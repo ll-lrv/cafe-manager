@@ -57,6 +57,27 @@
       "when": 1791259900283,
       "tag": "20261006041140_record_sales",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791261064987,
+      "tag": "20261006043104_stock_count_lines_counted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791261080094,
+      "tag": "20261006043120_stock_count_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791261337288,
+      "tag": "20261006043537_stock_count_realtime",
+      "breakpoints": true
     }
   ]
 }

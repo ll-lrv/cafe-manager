@@ -102,26 +102,24 @@ describe("fifo", () => {
 });
 
 describe("stock count", () => {
-  it("완료 시점 장부 재고와의 차이만 조정한다", () => {
-    const current = new Map([
-      ["a", 100],
-      ["b", 50],
-      ["c", 10],
-    ]);
+  it("센 시각의 장부 재고와의 차이만 조정하고, 세지 않은 품목은 건너뛴다", () => {
     expect(
-      countAdjustments(
-        [
-          { itemId: "a", countedQuantity: 90 },
-          { itemId: "b", countedQuantity: 50 },
-          { itemId: "c", countedQuantity: null },
-          { itemId: "d", countedQuantity: 5 },
-        ],
-        current,
-      ),
+      countAdjustments([
+        { itemId: "a", countedQuantity: 90, bookQuantity: 100 },
+        { itemId: "b", countedQuantity: 50, bookQuantity: 50 },
+        { itemId: "c", countedQuantity: null, bookQuantity: 10 },
+        { itemId: "d", countedQuantity: 5, bookQuantity: 0 },
+        { itemId: "e", countedQuantity: 0.3, bookQuantity: 0.1 },
+      ]),
     ).toEqual([
       { itemId: "a", quantity: -10 },
       { itemId: "d", quantity: 5 },
+      { itemId: "e", quantity: 0.2 },
     ]);
+  });
+
+  it("음수 실사 수량은 거부한다", () => {
+    expect(() => countAdjustments([{ itemId: "a", countedQuantity: -1, bookQuantity: 0 }])).toThrow();
   });
 });
 
