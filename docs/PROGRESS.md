@@ -90,6 +90,13 @@
   `useFormAction` 은 액션 결과 타입을 제네릭으로 받는다 (초대의 `token` 처럼 추가 필드가 있는 결과)
 - `@cafe/core`, `@cafe/db` 에 lint 스크립트 (`@eslint/js` + `typescript-eslint` 권장 규칙). `pnpm lint` 가 세 패키지를 모두 검사
 - 확인: typecheck·lint·단위 테스트 21개, 전체 E2E 218개 통과 (가입·초대에 입력값 유지·메모 비움 2개 추가)
+- E2E 를 `@playwright/test` 로 전환 (`e2e/tests/*.spec.ts`)
+  - 공통 fixture `app`: 가입+매장(`owner`), 초대로 직원 가입(`joinByInvite`), 다른 기기(`newPage`), 페이지·콘솔 오류 수집
+  - 도우미(`helpers.ts`): 품목·메뉴·레시피·입출고·판매, 실시간 반영 확인. 시나리오마다 복사돼 있던 것을 하나로
+  - 확인 항목은 `expect.soft`(실패해도 끝까지), 단계는 `test.step`. 3개 병렬, 재시도 1회, HTML 리포트, 실패 시 trace
+  - 테스트 데이터: 테스트가 끝나면 만든 계정·매장을 지운다. 강제 종료로 남은 것은 다음 실행 때(1시간 넘은 것), `e2e:cleanup` 으로 바로
+  - 개발 서버가 없으면 Playwright 가 띄운다 (`webServer`). 설치된 Chrome 사용 (`channel: "chrome"`)
+  - 옮기면서 고친 것: 누를 수 없는 체크 칸을 기다리다 멈추던 곳(발주 취소), 알림 직후 화면을 읽던 곳(일부 입고). 동작 제한 시간 15초
 
 ## 다시 시작하는 방법
 
@@ -113,7 +120,6 @@
 재고관리 MVP(품목·입출고·재고 현황·메뉴/판매·실사·발주)는 끝났다. 다음 단계 후보:
 
 1. **MVP 다듬기**
-   - E2E 를 `@playwright/test` 로 정식 전환 (지금은 `e2e/` 의 Node 스크립트 7개, 218개 항목, `pnpm e2e`)
    - 매장 시간대를 설정으로 (지금은 Asia/Seoul 고정, `lib/inventory.ts`)
 2. **매출 연동**: CSV 업로드 → `record_sales` 를 `source = 'csv'`, `external_id` 로 중복 방지하며 호출. 이후 POS 연동
 3. **분석**: 기간별 매출·원가·마진, 메뉴별 원가율 추이, 재료 소모·폐기율

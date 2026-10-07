@@ -21,7 +21,7 @@ Supabase로 MVP를 만들고, 이후 NestJS + PostgreSQL로 점진 전환할 계
 
 ## 명령어
 - `pnpm dev` / `pnpm test` / `pnpm typecheck` / `pnpm lint`
-- `pnpm e2e` — 브라우저 E2E 전체 (로컬 Supabase + `pnpm dev` 필요, `e2e/README.md`). 화면을 바꾸면 관련 시나리오를 돌린다
+- `pnpm e2e` — 브라우저 E2E 전체 (`@playwright/test`, 로컬 Supabase 필요, `e2e/README.md`). 화면을 바꾸면 관련 시나리오를 돌린다 (`pnpm e2e sales`). 테스트 계정은 `app.email()` 로만 만든다 (끝나면 지워진다)
 - `npx supabase start` (Docker 필요) / `pnpm db:reset` 은 로컬 DB를 비우고 마이그레이션을 처음부터 다시 적용
 - 스키마 변경 후: `pnpm db:generate --name <이름>` → `npx supabase migration up` → `pnpm db:types`
 - RLS·함수 등 Supabase 전용 SQL: `packages/db` 에서 `npx drizzle-kit generate --custom --name <이름>` 로 빈 파일을 만들어 작성

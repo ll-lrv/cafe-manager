@@ -66,7 +66,7 @@ pnpm dev                   # http://localhost:3000
 | 명령 | 하는 일 |
 |---|---|
 | `pnpm dev` / `pnpm typecheck` / `pnpm lint` / `pnpm test` | 개발 서버 / 타입 검사 / lint / core 단위 테스트 |
-| `pnpm e2e` | 브라우저 E2E 전체 (Supabase + `pnpm dev` 가 떠 있어야 함, `e2e/README.md`) |
+| `pnpm e2e` / `pnpm e2e sales` | 브라우저 E2E 전체 / 하나 (Supabase 가 떠 있어야 함. 개발 서버는 없으면 띄움, `e2e/README.md`) |
 | `pnpm db:generate --name <이름>` | `packages/db` 스키마 변경 → 마이그레이션 SQL 생성 |
 | `cd packages/db && npx drizzle-kit generate --custom --name <이름>` | 함수·RLS 등 Supabase 전용 SQL 용 빈 마이그레이션 |
 | `npx supabase migration up` | 새 마이그레이션 적용 |
@@ -89,7 +89,7 @@ apps/web                Next.js 16 (App Router)
 packages/core           순수 TS 비즈니스 로직 + 단위 테스트 (DB·프레임워크 의존 금지)
 packages/db             Drizzle 스키마 (스키마 변경은 반드시 여기서)
 supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL
-e2e/                    브라우저 E2E 시나리오 7개 (playwright-core + 설치된 Chrome)
+e2e/                    브라우저 E2E 시나리오 7개 (@playwright/test + 설치된 Chrome)
 docs/                   이 문서, PROGRESS, db-functions
 ```
 
@@ -232,10 +232,12 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | core 단위 테스트 (vitest) | 21개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`, `pnpm lint` 통과 (lint: `apps/web` 은 Next 규칙, `core`·`db` 는 `typescript-eslint` 권장 규칙) |
 | DB 함수 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
-| 브라우저 E2E | `e2e/` 7개 시나리오, **218개 항목 통과** (가입·초대 21, 품목 49, 입출고 28, 재고 현황 20, 판매 36, 실사 23, 발주 41). `pnpm e2e` |
+| 브라우저 E2E | `e2e/tests/` 7개 시나리오 통과 (가입·초대, 품목, 입출고, 재고 현황, 판매, 실사, 발주). `pnpm e2e` |
 
-브라우저 E2E는 `playwright-core` 로 설치된 Chrome 을 직접 조작하는 Node 스크립트다 (`@playwright/test` 아님). 실행 방법·시나리오 설명은 `e2e/README.md`.
-실행할 때마다 새 계정·매장을 만들어 로컬 DB에 테스트 데이터가 쌓인다. CI에는 아직 연결하지 않았다.
+브라우저 E2E는 `@playwright/test` 다. 시나리오 하나가 테스트 하나이고 단계(`test.step`)로 나뉘며, 확인 항목은 `expect.soft` 라 하나가 실패해도 끝까지 돈다.
+공통 준비(가입·매장 만들기·초대·품목/메뉴 만들기)는 `e2e/fixtures.ts`·`helpers.ts`. 3개씩 병렬, 실패하면 한 번 재시도, HTML 리포트와 실패 시 trace.
+실행 방법·시나리오 설명·새 테스트 쓰는 법은 `e2e/README.md`.
+테스트는 `e2e-...@test.kr` 계정과 매장을 만들고 끝나면 지운다 (강제 종료로 남은 것은 다음 실행 때, 바로 지우려면 `pnpm --filter @cafe/e2e e2e:cleanup`). CI에는 아직 연결하지 않았다 (원격 저장소를 정할 때 함께).
 E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스크린샷이 넣는 스타일 때문이다. 앱 문제가 아니다.
 
 ---
@@ -244,7 +246,8 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 
 ### 1) MVP 다듬기 — 먼저 하길 권장
 - [x] E2E 스크립트를 저장소 `e2e/` 로 옮김 (`pnpm e2e`, 216개 항목)
-- [ ] E2E 를 `@playwright/test` 로 정식 전환: 중복된 도우미(가입, 품목·메뉴 만들기, 초대)를 공통 fixture 로, 리포트·재시도·병렬 실행. 테스트 데이터 정리 방법(전용 DB 또는 실행 후 정리)과 CI 연결도 정한다
+- [x] E2E 를 `@playwright/test` 로 정식 전환: 공통 fixture, 리포트·재시도·병렬, 실행 후 테스트 데이터 정리
+- [ ] E2E 를 CI 에서 돌리기 (원격 저장소·배포 환경을 정할 때. CI 에서 Supabase 를 띄우는 설정 필요)
 - [x] 로그인·매장 만들기·직원 초대 폼을 `useFormAction` 으로 (오류 시 입력값 유지)
 - [x] `@cafe/core`, `@cafe/db` 에 lint 스크립트
 - [ ] `pnpm db:reset` 으로 마이그레이션 13개를 처음부터 적용해 확인 (로컬 테스트 계정은 지워진다)
@@ -273,7 +276,7 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 ## 11. 알려진 제한
 
 - 배포·원격 저장소 없음 (로컬 전용)
-- 브라우저 E2E는 저장소에 있지만(`e2e/`) CI 미연결, 실행마다 테스트 데이터가 쌓임 (§9)
+- 브라우저 E2E는 CI 미연결 (§9)
 - 판매 취소는 다른 기기 화면에 즉시 반영되지 않음 (다음 변경 때 반영)
 - 한 트랜잭션 안에서 입고를 두 번 하면 "최근 입고 단가"가 같은 시각이라 어느 쪽인지 정해지지 않는다 (실제 사용에서는 기록마다 시각이 달라 문제없음)
 - 실사로 늘어난 양은 유통기한 정보 없이 기록된다 (품목 상세에 "유통기한 기록 없음"으로 표시). 입출고 화면의 "조정 → 늘리기"는 유통기한을 넣을 수 있다
