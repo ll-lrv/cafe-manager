@@ -18,7 +18,8 @@
 
 - 완료: 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주
 - 다음 단계: MVP 다듬기 → 매출(CSV/POS) 연동 → 분석 → NestJS 전환 → Expo 앱 (§10)
-- 배포: **아직 없음**. 로컬 Supabase(Docker)에서만 동작한다. 원격 git 저장소도 아직 없다.
+- 저장소: https://github.com/ll-lrv/cafe-manager (공개). push·PR 마다 GitHub Actions CI(`.github/workflows/ci.yml`)가 타입·lint·단위 테스트와 브라우저 E2E 를 돌린다
+- 배포: **아직 없음**. 로컬 Supabase(Docker)에서만 동작한다. 후보는 Supabase 클라우드 + Vercel (§10)
 
 ---
 
@@ -240,7 +241,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 브라우저 E2E는 `@playwright/test` 다. 시나리오 하나가 테스트 하나이고 단계(`test.step`)로 나뉘며, 확인 항목은 `expect.soft` 라 하나가 실패해도 끝까지 돈다.
 공통 준비(가입·매장 만들기·초대·품목/메뉴 만들기)는 `e2e/fixtures.ts`·`helpers.ts`. 3개씩 병렬, 실패하면 한 번 재시도, HTML 리포트와 실패 시 trace.
 실행 방법·시나리오 설명·새 테스트 쓰는 법은 `e2e/README.md`.
-테스트는 `e2e-...@test.kr` 계정과 매장을 만들고 끝나면 지운다 (강제 종료로 남은 것은 다음 실행 때, 바로 지우려면 `pnpm --filter @cafe/e2e e2e:cleanup`). CI에는 아직 연결하지 않았다 (원격 저장소를 정할 때 함께).
+테스트는 `e2e-...@test.kr` 계정과 매장을 만들고 끝나면 지운다 (강제 종료로 남은 것은 다음 실행 때, 바로 지우려면 `pnpm --filter @cafe/e2e e2e:cleanup`). CI(GitHub Actions)에서도 돈다: `supabase start` 로 빈 DB에 마이그레이션 적용 → 러너의 Chrome 으로 `pnpm e2e` (2 workers). 실패하면 실행 화면의 Artifacts 에서 `playwright-report` 를 받아 본다.
 E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스크린샷이 넣는 스타일 때문이다. 앱 문제가 아니다.
 
 ---
@@ -250,13 +251,14 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 ### 1) MVP 다듬기 — 먼저 하길 권장
 - [x] E2E 스크립트를 저장소 `e2e/` 로 옮김 (`pnpm e2e`, 216개 항목)
 - [x] E2E 를 `@playwright/test` 로 정식 전환: 공통 fixture, 리포트·재시도·병렬, 실행 후 테스트 데이터 정리
-- [ ] E2E 를 CI 에서 돌리기 (원격 저장소·배포 환경을 정할 때. CI 에서 Supabase 를 띄우는 설정 필요)
+- [x] E2E 를 CI 에서 돌리기 (GitHub Actions, 2026-10-07 첫 실행 통과)
 - [x] 로그인·매장 만들기·직원 초대 폼을 `useFormAction` 으로 (오류 시 입력값 유지)
 - [x] `@cafe/core`, `@cafe/db` 에 lint 스크립트
 - [x] `pnpm db:reset` 으로 마이그레이션 15개를 처음부터 적용해 확인 (2026-10-07, 이후 E2E 8개 통과)
 - [x] 매장 시간대를 매장 설정으로, 매장 정보 화면(`/settings/store`)
 - [x] 판매 취소가 다른 기기에 바로 반영되게 (DB 트리거 → 매장 전용 비공개 채널 방송)
-- [ ] 원격 git 저장소 연결, 배포 환경(Supabase 클라우드 + Vercel 등) 결정
+- [x] 원격 git 저장소 연결 (https://github.com/ll-lrv/cafe-manager, 공개. 커밋 이메일은 GitHub noreply)
+- [ ] 배포 환경 결정·구성 (후보: Supabase 클라우드(서울) + Vercel. 무료 등급 조건·운영 메일(SMTP)·가입 확인 메일 설정 확인)
 
 ### 2) 매출 연동
 - [ ] CSV 업로드: 파일 → 메뉴 매칭(`menus.external_id`) → `record_sales` 를 `source = 'csv'`, `external_id` 로 호출 (`sale_records_external_key` 로 중복 방지). 함수에 source·external_id 인자 추가 필요
@@ -279,7 +281,6 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 ## 11. 알려진 제한
 
 - 배포·원격 저장소 없음 (로컬 전용)
-- 브라우저 E2E는 CI 미연결 (§9)
 - 한 트랜잭션 안에서 입고를 두 번 하면 "최근 입고 단가"가 같은 시각이라 어느 쪽인지 정해지지 않는다 (실제 사용에서는 기록마다 시각이 달라 문제없음)
 - 실사로 늘어난 양은 유통기한 정보 없이 기록된다 (품목 상세에 "유통기한 기록 없음"으로 표시). 입출고 화면의 "조정 → 늘리기"는 유통기한을 넣을 수 있다
 - 리포트 화면 없음

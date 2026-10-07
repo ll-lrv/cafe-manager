@@ -98,7 +98,9 @@
   - 확인: 트리거를 끄면 E2E 가 실패하는 것, 다른 사람은 채널 메시지를 못 읽는 것(SQL)
 - E2E: `store` 시나리오 추가(호놀룰루 시간대로 바꿔 판매 날짜 확인), 판매 시나리오에 취소 실시간 반영. 8개 통과
 - `pnpm db:reset` 으로 로컬 DB를 비우고 마이그레이션 15개를 처음부터 적용 → 오류 없음, E2E 8개 통과 (2026-10-07, 로컬 데이터 모두 삭제)
-- CI(`.github/workflows/ci.yml`): 타입·lint·단위 테스트, Supabase 를 띄워 마이그레이션 적용 후 E2E
+- CI(`.github/workflows/ci.yml`): 타입·lint·단위 테스트, Supabase 를 띄워 마이그레이션 적용 후 E2E. 첫 실행 둘 다 통과 (E2E 8개 3.4분)
+- GitHub 공개 저장소 https://github.com/ll-lrv/cafe-manager 에 올림. 올리기 전 커밋 이메일을 GitHub noreply 로 바꿈 (커밋 ID 바뀜)
+  - 예전 저장소는 `cafe-manager_v1` (이름이 겹쳐 `C:\project\cafe-manager_v1` 의 origin 을 `.../cafe-manager_v1.git` 로 바꿈)
 - E2E 를 `@playwright/test` 로 전환 (`e2e/tests/*.spec.ts`)
   - 공통 fixture `app`: 가입+매장(`owner`), 초대로 직원 가입(`joinByInvite`), 다른 기기(`newPage`), 페이지·콘솔 오류 수집
   - 도우미(`helpers.ts`): 품목·메뉴·레시피·입출고·판매, 실시간 반영 확인. 시나리오마다 복사돼 있던 것을 하나로
@@ -129,7 +131,7 @@
 재고관리 MVP(품목·입출고·재고 현황·메뉴/판매·실사·발주)는 끝났다. 다음 단계 후보:
 
 1. **MVP 다듬기** (남은 것)
-   - 원격 git 저장소 연결, 배포 환경(Supabase 클라우드 + Vercel 등) 결정, E2E CI 연결
+   - 배포 환경 결정·구성 (후보: Supabase 클라우드 + Vercel)
 2. **매출 연동**: CSV 업로드 → `record_sales` 를 `source = 'csv'`, `external_id` 로 중복 방지하며 호출. 이후 POS 연동
 3. **분석**: 기간별 매출·원가·마진, 메뉴별 원가율 추이, 재료 소모·폐기율
 4. **NestJS 전환 시작**: `docs/db-functions.md` 의 대응표대로 기능 단위로 옮긴다
