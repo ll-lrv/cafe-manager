@@ -2,11 +2,11 @@
 
 > 프로젝트 전체 요약과 인수인계는 `docs/HANDOVER.md` 를 먼저 본다.
 
-마지막 업데이트: 2026-10-06
+마지막 업데이트: 2026-10-07
 
 ## 지금까지 한 것
 
-### 1. 모노레포 + DB 스키마 (커밋 `58487f6`)
+### 1. 모노레포 + DB 스키마 (커밋 `bb4f517`)
 - pnpm + Turborepo: `apps/web`(Next.js 16), `packages/db`(Drizzle), `packages/core`(순수 TS 로직)
 - 스키마: 매장/권한, 품목·단위 환산, 입출고 원장, 유통기한 로트, 메뉴·레시피, 판매, 거래처·발주, 실사
 - `packages/core`: 단위 환산, 레시피 차감, FIFO 로트 배분, 실사 조정, 발주 상태, 권한 표 (테스트 13개)
@@ -84,32 +84,46 @@
 - `useFormAction` 에 `toastResult` 옵션: 성공하면 폼이 사라지는 곳(입고 완료)에서도 알림이 뜨도록
 - 확인: SQL 검증 + 브라우저 E2E 41개, 전체 E2E 회귀 197개 통과
 
-### 9. MVP 다듬기 (진행 중)
-- 브라우저 E2E 스크립트를 저장소 `e2e/` 로 옮김 (`pnpm e2e`)
+### 9. MVP 다듬기 (2026-10-07, 배포 제외 완료)
+
+**폼·lint** (`3cd7f5f`)
 - 로그인·회원가입·매장 만들기·직원 초대 폼을 `useFormAction` 으로: 오류가 나도 입력값 유지, 초대 링크를 만들면 메모 칸 비움.
   `useFormAction` 은 액션 결과 타입을 제네릭으로 받는다 (초대의 `token` 처럼 추가 필드가 있는 결과)
 - `@cafe/core`, `@cafe/db` 에 lint 스크립트 (`@eslint/js` + `typescript-eslint` 권장 규칙). `pnpm lint` 가 세 패키지를 모두 검사
-- 확인: typecheck·lint·단위 테스트 21개, 전체 E2E 218개 통과 (가입·초대에 입력값 유지·메모 비움 2개 추가)
-- 매장 시간대·매장 설정 (`/settings/store`, 사장)
-  - "오늘", 하루 범위, 지난 날짜 판매의 23:59, 화면의 날짜·시각 표시가 모두 `stores.timezone` 을 따른다 (그동안 Asia/Seoul 고정)
-  - core `time.ts`: `zonedTimeToUtc`(서머타임 반영), `isValidTimeZone`, `dateInTimeZone`(옮김). 테스트 23개
-  - DB: 사장은 `name`·`timezone` 만 수정(컬럼 권한), 트리거 `validate_store` 가 이름·시간대 검사
-- 판매 취소 실시간 반영: 트리거가 `realtime.send` 로 비공개 채널 `store:<id>` 에 방송, `realtime.messages` 정책으로 그 매장 구성원만 수신
-  - 확인: 트리거를 끄면 E2E 가 실패하는 것, 다른 사람은 채널 메시지를 못 읽는 것(SQL)
-- E2E: `store` 시나리오 추가(호놀룰루 시간대로 바꿔 판매 날짜 확인), 판매 시나리오에 취소 실시간 반영. 8개 통과
-- `pnpm db:reset` 으로 로컬 DB를 비우고 마이그레이션 15개를 처음부터 적용 → 오류 없음, E2E 8개 통과 (2026-10-07, 로컬 데이터 모두 삭제)
-- CI(`.github/workflows/ci.yml`): 타입·lint·단위 테스트, Supabase 를 띄워 마이그레이션 적용 후 E2E. 첫 실행 둘 다 통과 (E2E 8개 3.4분)
-- GitHub 공개 저장소 https://github.com/ll-lrv/cafe-manager 에 올림. 올리기 전 커밋 이메일을 GitHub noreply 로 바꿈 (커밋 ID 바뀜)
-  - 예전 저장소는 `cafe-manager_v1` (이름이 겹쳐 `C:\project\cafe-manager_v1` 의 origin 을 `.../cafe-manager_v1.git` 로 바꿈)
-- E2E 를 `@playwright/test` 로 전환 (`e2e/tests/*.spec.ts`)
-  - 공통 fixture `app`: 가입+매장(`owner`), 초대로 직원 가입(`joinByInvite`), 다른 기기(`newPage`), 페이지·콘솔 오류 수집
-  - 도우미(`helpers.ts`): 품목·메뉴·레시피·입출고·판매, 실시간 반영 확인. 시나리오마다 복사돼 있던 것을 하나로
-  - 확인 항목은 `expect.soft`(실패해도 끝까지), 단계는 `test.step`. 3개 병렬, 재시도 1회, HTML 리포트, 실패 시 trace
-  - 테스트 데이터: 테스트가 끝나면 만든 계정·매장을 지운다. 강제 종료로 남은 것은 다음 실행 때(1시간 넘은 것), `e2e:cleanup` 으로 바로
-  - 개발 서버가 없으면 Playwright 가 띄운다 (`webServer`). 설치된 Chrome 사용 (`channel: "chrome"`)
-  - 옮기면서 고친 것: 누를 수 없는 체크 칸을 기다리다 멈추던 곳(발주 취소), 알림 직후 화면을 읽던 곳(일부 입고). 동작 제한 시간 15초
+
+**E2E 를 `@playwright/test` 로 전환** (`7927e2f`, 그 전에 `471eeff` 에서 스크립트를 저장소 `e2e/` 로 옮김)
+- 공통 fixture `app`: 가입+매장(`owner`), 초대로 직원 가입(`joinByInvite`), 다른 기기(`newPage`), 페이지·콘솔 오류 수집
+- 도우미(`helpers.ts`): 품목·메뉴·레시피·입출고·판매, 실시간 반영 확인. 시나리오마다 복사돼 있던 것을 하나로
+- 확인 항목은 `expect.soft`(실패해도 끝까지), 단계는 `test.step`. 3개 병렬, 재시도 1회, HTML 리포트, 실패 시 trace
+- 테스트 데이터: 테스트가 끝나면 만든 계정·매장을 지운다. 강제 종료로 남은 것은 다음 실행 때(1시간 넘은 것), `e2e:cleanup` 으로 바로
+- 개발 서버가 없으면 Playwright 가 띄운다 (`webServer`). 설치된 Chrome 사용 (`channel: "chrome"`)
+- 옮기면서 고친 테스트 쪽 타이밍 문제: 누를 수 없는 체크 칸을 기다리다 멈추던 곳(발주 취소), 알림 직후 화면을 읽던 곳 4군데, 같은 알림이 연달아 뜨는 곳(다시 발주). 동작 제한 시간 15초.
+  재시도 없이 2번씩 돌려 14/14 통과를 확인
+- 예전 실행이 쌓은 테스트 계정 179개와 그 매장은 지웠다
+
+**매장 설정·매장 시간대** (`261f6a7`)
+- `/settings/store` (사장): 매장 이름·시간대
+- "오늘", 하루 범위, 지난 날짜 판매의 23:59, 화면의 날짜·시각 표시가 모두 `stores.timezone` 을 따른다 (그동안 Asia/Seoul 고정)
+- core `time.ts`: `zonedTimeToUtc`(서머타임 반영), `isValidTimeZone`, `dateInTimeZone`(옮김). 테스트 23개
+- DB: 사장은 `name`·`timezone` 만 수정(컬럼 권한), 트리거 `validate_store` 가 이름·시간대 검사. Node 가 내는 시간대 목록이 모두 Postgres 에도 있는 것을 확인
+- E2E `store` 시나리오: 호놀룰루 시간대로 바꿔 판매 화면의 "오늘"과 23:59 기록 확인
+
+**판매 취소 실시간 반영** (`261f6a7`)
+- 트리거가 `realtime.send` 로 비공개 채널 `store:<id>` 에 방송, `realtime.messages` 정책으로 그 매장 구성원만 수신
+- 확인: 트리거를 끄면 E2E 가 실패하는 것, 다른 사람은 채널 메시지를 못 읽는 것(SQL)
+
+**마이그레이션 처음부터 적용** (커밋 없음)
+- `pnpm db:reset` 으로 로컬 DB를 비우고 마이그레이션 15개를 처음부터 적용 → 오류 없음, E2E 8개 통과. **로컬 데이터 모두 삭제** (직접 만든 계정·매장 포함, 사용자 확인 후)
+
+**GitHub·CI** (`38e95f3`, `b4dcb74`)
+- 공개 저장소 https://github.com/ll-lrv/cafe-manager. 올리기 전 커밋 이메일을 GitHub noreply 로 바꿈 (`filter-branch`, 커밋 ID 가 모두 바뀜. 위 커밋 ID 는 바뀐 뒤 것)
+  - 예전 저장소는 `cafe-manager_v1` (이름이 `cafe-manager` 에서 바뀐 것). 새 저장소가 옛 이름을 쓰면 리디렉트가 끊겨, `C:\project\cafe-manager_v1` 의 origin 을 `.../cafe-manager_v1.git` 로 바꿈
+- CI(`.github/workflows/ci.yml`): 타입·lint·단위 테스트 / Supabase 를 띄워 마이그레이션 적용 후 E2E (2 workers). 첫 실행부터 둘 다 통과 (E2E 8개 3.4분)
+- Actions 를 Node 24 버전으로 올림 (checkout v7, setup-node v7, pnpm/action-setup v6, upload-artifact v7, supabase/setup-cli v3). 메이저 변경 내역 확인 후 올렸고 다시 통과
 
 ## 다시 시작하는 방법
+
+처음 받는 PC라면 `git clone https://github.com/ll-lrv/cafe-manager.git` 후 `pnpm install`.
 
 1. **Docker Desktop 실행** (`%LOCALAPPDATA%\Programs\DockerDesktop\Docker Desktop.exe`)
 2. 로컬 Supabase 시작 (데이터는 그대로 남아 있음)
@@ -121,17 +135,18 @@
    pnpm dev
    ```
    → http://localhost:3000 · DB 보기: Supabase Studio http://127.0.0.1:55323
-4. 처음부터 깨끗한 DB가 필요하면 `pnpm db:reset` (테스트 계정 모두 삭제)
+4. 처음부터 깨끗한 DB가 필요하면 `pnpm db:reset` (모든 계정·데이터 삭제)
+
+로컬 DB는 2026-10-07 에 비웠다. 화면을 써 보려면 새로 가입해 매장을 만든다.
 
 `apps/web/.env.local` 은 git에 없다. 새로 받은 경우 `.env.example` 을 복사하고
 `npx supabase status` 의 Publishable key 를 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 에 넣는다.
 
 ## 다음 할 일
 
-재고관리 MVP(품목·입출고·재고 현황·메뉴/판매·실사·발주)는 끝났다. 다음 단계 후보:
+재고관리 MVP와 MVP 다듬기는 끝났다. 자세한 순서·체크리스트는 `docs/HANDOVER.md` §10.
 
-1. **MVP 다듬기** (남은 것)
-   - 배포 환경 결정·구성 (후보: Supabase 클라우드 + Vercel)
+1. **배포**: 후보 Supabase 클라우드(서울) + Vercel. 환경 개수·요금 등급·주소를 사용자와 정한 뒤 진행
 2. **매출 연동**: CSV 업로드 → `record_sales` 를 `source = 'csv'`, `external_id` 로 중복 방지하며 호출. 이후 POS 연동
 3. **분석**: 기간별 매출·원가·마진, 메뉴별 원가율 추이, 재료 소모·폐기율
 4. **NestJS 전환 시작**: `docs/db-functions.md` 의 대응표대로 기능 단위로 옮긴다

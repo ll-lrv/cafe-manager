@@ -10,6 +10,7 @@ Supabase로 MVP를 만들고, 이후 NestJS + PostgreSQL로 점진 전환할 계
 - `packages/db` — Drizzle 스키마. **스키마 변경은 반드시 여기서** 하고 `pnpm db:generate --name <이름>` 으로 마이그레이션 생성
 - `packages/core` — 순수 TS 비즈니스 로직(단위 환산, 레시피 차감, FIFO, 실사, 권한). DB/프레임워크 의존 금지
 - `supabase/migrations` — drizzle-kit 생성 SQL + Supabase 전용 SQL(RLS, 트리거)
+- `e2e` — 브라우저 E2E (`@playwright/test`), `.github/workflows/ci.yml` — CI
 
 ## 규칙
 - 재고는 `stock_movements` 원장 합계로 계산한다. 원장 행은 수정/삭제하지 않고 `adjust` 로 바로잡는다 (예외: 판매 취소 시 그 판매의 `sale` 원장은 cascade 로 함께 삭제)
@@ -18,10 +19,12 @@ Supabase로 MVP를 만들고, 이후 NestJS + PostgreSQL로 점진 전환할 계
 - 금액은 원(KRW) 정수
 - 권한 표는 `packages/core/src/permissions.ts` 와 RLS 마이그레이션을 함께 맞춘다
 - 화면 컴포넌트에서 supabase 클라이언트를 직접 호출하지 말고 `apps/web/src/lib/api/*` 를 거친다 (NestJS 전환 대비)
+- 날짜·시각은 매장 시간대(`store.timeZone`) 기준으로 계산·표시한다. `"Asia/Seoul"` 을 코드에 박지 않는다
 
 ## 명령어
 - `pnpm dev` / `pnpm test` / `pnpm typecheck` / `pnpm lint`
 - `pnpm e2e` — 브라우저 E2E 전체 (`@playwright/test`, 로컬 Supabase 필요, `e2e/README.md`). 화면을 바꾸면 관련 시나리오를 돌린다 (`pnpm e2e sales`). 테스트 계정은 `app.email()` 로만 만든다 (끝나면 지워진다)
+- GitHub(https://github.com/ll-lrv/cafe-manager, 공개)에 push 하면 CI 가 타입·lint·단위 테스트와 E2E 를 돌린다
 - `npx supabase start` (Docker 필요) / `pnpm db:reset` 은 로컬 DB를 비우고 마이그레이션을 처음부터 다시 적용
 - 스키마 변경 후: `pnpm db:generate --name <이름>` → `npx supabase migration up` → `pnpm db:types`
 - RLS·함수 등 Supabase 전용 SQL: `packages/db` 에서 `npx drizzle-kit generate --custom --name <이름>` 로 빈 파일을 만들어 작성
