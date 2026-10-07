@@ -51,7 +51,7 @@ npx supabase start -x imgproxy,edge-runtime,logflare,vector,supavisor
 npx supabase status        # Publishable key 를 .env.local 의 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 에
 pnpm dev                   # http://localhost:3000
 ```
-- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 13개가 모두 적용된다.
+- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 15개가 모두 적용된다.
 - DB 보기: Supabase Studio http://127.0.0.1:55323 · 메일함(Mailpit) http://127.0.0.1:55324
 
 ### 이어서 작업할 때
@@ -122,6 +122,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `/orders`, `/orders/[id]`, `/orders/new` | 발주서 (부족 품목 추천, 발주 내용 복사, 일부 입고, 마감) | 사장·매니저 |
 | `/suppliers`, `/suppliers/[id]`, `/suppliers/new` | 거래처 | 사장·매니저 |
 | `/settings/members` | 직원 초대(링크), 역할 변경, 내보내기 | 사장 |
+| `/settings/store` | 매장 이름, 시간대 | 사장 |
 
 ### 꼭 알아야 할 동작
 - **재고 마이너스 허용**: 기록이 늦게 들어오는 현실 때문. 화면에서 경고만 한다.
@@ -129,7 +130,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - **실사 조정 기준 = 품목을 센 시각의 장부**: 세는 도중·센 뒤의 판매가 있어도 정확하다. (시작·완료 시점 비교가 아님)
 - **메뉴 원가** = 레시피 사용량 × 재료의 최근 입고 단가(`item_latest_costs` 뷰). 단가를 넣지 않은 입고는 원가에 쓰이지 않는다.
 - **발주 추천 수량** = 부족 알림 기준 × 2 까지 채우는 양, 기본 입고 단위로 올림.
-- **"오늘"** 은 한국 시간(Asia/Seoul) 고정 (`lib/inventory.ts`).
+- **"오늘"·하루의 경계·화면의 날짜와 시각** 은 매장 시간대(`stores.timezone`, 기본 Asia/Seoul, 매장 설정에서 변경)를 따른다. 지난 날짜 판매는 그 시간대의 23:59 로 기록 (`lib/inventory.ts`, core `zonedTimeToUtc`). 시간대를 바꿔도 이미 기록된 시각은 그대로다.
 - **삭제 대신 보관**: 품목·메뉴·거래처는 보관(archived_at)만 한다.
 
 ---
@@ -151,7 +152,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `purchase:manage` 발주·입고 처리 | ✓ | ✓ | |
 | `report:view` 리포트 (아직 화면 없음) | ✓ | ✓ | |
 | `member:manage` 직원 관리 | ✓ | | |
-| `store:manage` 매장 정보 (아직 화면 없음) | ✓ | | |
+| `store:manage` 매장 정보 (이름·시간대) | ✓ | | |
 
 권한 확인은 3중이다: 화면(버튼 숨김) → 서버 액션(`can`) → DB(RLS·컬럼 권한·함수). DB가 최종 방어다.
 
@@ -171,6 +172,8 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `20261006041140_record_sales` | 판매 함수, 공용 `stock_outflow`, 판매 직접 INSERT 금지 |
 | `20261006043104/20/37_stock_count_*` | 실사 컬럼·뷰, 실사 함수·트리거·컬럼 권한, Realtime |
 | `20261006044355/57_purchas*` | 발주 줄 중복 금지, 발주 함수·컬럼 권한 |
+| `20261007100209_store_settings` | 매장 이름·시간대만 수정(컬럼 권한), 값 검사 트리거 |
+| `20261007100554_sale_cancel_broadcast` | 판매 취소를 매장 전용 비공개 Realtime 채널로 방송, 구성원만 수신 |
 
 ### DB 함수 (상세는 `docs/db-functions.md`)
 | 함수 | 하는 일 |
@@ -214,7 +217,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 ### Supabase 클라이언트
 - **Realtime 은 구독 전에 `supabase.realtime.setAuth(access_token)` 필요.** 브라우저 클라이언트가 쿠키 세션 토큰을 실시간 연결에 자동으로 넣지 않아, 안 넣으면 익명으로 구독되어 RLS 에 막히고 이벤트가 오지 않는다 (`lib/api/realtime.ts` 의 `subscribe`).
-- 필터가 걸린 Realtime 구독에는 DELETE 이벤트가 오지 않는다.
+- 필터가 걸린 Realtime 구독에는 DELETE 이벤트가 오지 않는다. 삭제를 알려야 하면 DB 트리거에서 `realtime.send` 로 비공개 채널 `store:<id>` 에 방송한다 (예: 판매 취소). 받는 쪽은 `subscribe(..., { private: true })`, 수신 권한은 `realtime.messages` 정책
 - RLS 에 막힌 update/delete 는 오류 없이 0행 → `.select()` 로 행 수를 확인해 한국어 오류를 낸다.
 - uuid 형식이 아닌 ID 는 `22P02` 오류 → 404/"없는 ~" 로 처리한다.
 - 같은 테이블을 두 번 참조하면 embed 에 외래키 이름 힌트 필요 (예: `profiles!stock_counts_created_by_profiles_id_fk`).
@@ -250,9 +253,9 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 - [ ] E2E 를 CI 에서 돌리기 (원격 저장소·배포 환경을 정할 때. CI 에서 Supabase 를 띄우는 설정 필요)
 - [x] 로그인·매장 만들기·직원 초대 폼을 `useFormAction` 으로 (오류 시 입력값 유지)
 - [x] `@cafe/core`, `@cafe/db` 에 lint 스크립트
-- [ ] `pnpm db:reset` 으로 마이그레이션 13개를 처음부터 적용해 확인 (로컬 테스트 계정은 지워진다)
-- [ ] 매장 시간대를 매장 설정으로 (지금 Asia/Seoul 고정), 매장 정보 화면(`store:manage`)
-- [ ] 판매 취소가 다른 기기에 바로 반영되게 (필터 없는 DELETE 구독 또는 취소 이벤트용 별도 방송)
+- [ ] `pnpm db:reset` 으로 마이그레이션 15개를 처음부터 적용해 확인 (로컬 테스트 계정은 지워진다)
+- [x] 매장 시간대를 매장 설정으로, 매장 정보 화면(`/settings/store`)
+- [x] 판매 취소가 다른 기기에 바로 반영되게 (DB 트리거 → 매장 전용 비공개 채널 방송)
 - [ ] 원격 git 저장소 연결, 배포 환경(Supabase 클라우드 + Vercel 등) 결정
 
 ### 2) 매출 연동
@@ -277,8 +280,7 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 
 - 배포·원격 저장소 없음 (로컬 전용)
 - 브라우저 E2E는 CI 미연결 (§9)
-- 판매 취소는 다른 기기 화면에 즉시 반영되지 않음 (다음 변경 때 반영)
 - 한 트랜잭션 안에서 입고를 두 번 하면 "최근 입고 단가"가 같은 시각이라 어느 쪽인지 정해지지 않는다 (실제 사용에서는 기록마다 시각이 달라 문제없음)
 - 실사로 늘어난 양은 유통기한 정보 없이 기록된다 (품목 상세에 "유통기한 기록 없음"으로 표시). 입출고 화면의 "조정 → 늘리기"는 유통기한을 넣을 수 있다
-- 리포트·매장 설정 화면 없음
+- 리포트 화면 없음
 - 삭제·상태 변경 버튼(`ActionButton`)의 알림이 화면 갱신보다 아주 조금 먼저 뜬다. 사용에는 문제없지만, E2E 에서 알림 직후 화면을 읽으면 실패할 수 있어 결과 문구가 나타날 때까지 기다린다

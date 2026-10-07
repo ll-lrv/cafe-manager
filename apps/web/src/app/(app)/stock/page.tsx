@@ -73,7 +73,7 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
             )}
           </CardHeader>
           <CardContent>
-            <MovementList movements={movements} showItem={!selectedItem} />
+            <MovementList movements={movements} timeZone={store.timeZone} showItem={!selectedItem} />
           </CardContent>
         </Card>
       </div>

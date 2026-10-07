@@ -9,7 +9,7 @@ import { CancelInvitationButton, CopyLinkButton, InviteForm, MemberControls } fr
 
 export const metadata: Metadata = { title: "직원 관리" };
 
-const dateFormat = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", timeZone: "Asia/Seoul" });
+const dateFormat = (timeZone: string) => new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", timeZone });
 
 export default async function MembersPage() {
   const [user, store] = await Promise.all([requireUser(), requireCurrentStore()]);
@@ -54,7 +54,7 @@ export default async function MembersPage() {
                   <Badge variant="secondary">{ROLE_LABEL[inv.role]}</Badge>
                   <span className="min-w-0 truncate text-sm">{inv.email ?? "메모 없음"}</span>
                   <span className="text-xs text-muted-foreground">
-                    {dateFormat.format(new Date(inv.expiresAt))}까지
+                    {dateFormat(store.timeZone).format(new Date(inv.expiresAt))}까지
                   </span>
                   <div className="ml-auto flex gap-1">
                     <CopyLinkButton token={inv.token} />
@@ -79,7 +79,7 @@ export default async function MembersPage() {
                   {m.displayName}
                   {m.userId === user.id && <span className="ml-1 text-muted-foreground">(나)</span>}
                 </span>
-                <span className="text-xs text-muted-foreground">{dateFormat.format(new Date(m.joinedAt))} 참여</span>
+                <span className="text-xs text-muted-foreground">{dateFormat(store.timeZone).format(new Date(m.joinedAt))} 참여</span>
                 <div className="ml-auto">
                   {m.role === "owner" ? (
                     <Badge>{ROLE_LABEL.owner}</Badge>

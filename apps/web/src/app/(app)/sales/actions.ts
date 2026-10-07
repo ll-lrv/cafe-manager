@@ -34,10 +34,10 @@ export async function recordSalesAction(_prev: ActionState, formData: FormData):
     if (!can(store.role, "sale:record")) throw new ApiError("판매 입력 권한이 없습니다.");
 
     const date = String(formData.get("date") ?? "");
-    const today = storeToday();
+    const today = storeToday(store.timeZone);
     if (!isValidDate(date) || date > today) throw new ApiError("판매 날짜를 확인해 주세요.");
     // 오늘은 지금 시각, 지난 날짜는 그 날 마감 시각으로 기록한다.
-    const soldAt = date === today ? null : storeEndOfDay(date);
+    const soldAt = date === today ? null : storeEndOfDay(date, store.timeZone);
 
     const lines = readLines(formData);
     await recordSales(lines, soldAt);

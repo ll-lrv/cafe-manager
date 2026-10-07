@@ -8,6 +8,7 @@ import {
   daysUntilExpiry,
   expiryLabel,
   expiryStatus,
+  isValidTimeZone,
   derivePurchaseOrderStatus,
   formatQuantity,
   fromBaseQuantity,
@@ -18,6 +19,7 @@ import {
   saleDeductions,
   stockStatus,
   suggestOrderQuantity,
+  zonedTimeToUtc,
   toBaseQuantity,
   toBaseUnitCost,
 } from "./index";
@@ -191,6 +193,22 @@ describe("stock-status", () => {
     expect(dateInTimeZone(now, "Asia/Seoul")).toBe("2026-10-07");
     expect(daysUntilExpiry("2026-10-10", dateInTimeZone(now, "Asia/Seoul"))).toBe(3);
     expect(daysUntilExpiry("2026-10-10", "2026-10-10")).toBe(0);
+  });
+
+  it("시간대의 벽시계 시각을 실제 순간으로 바꾼다", () => {
+    expect(zonedTimeToUtc("2026-10-07", "00:00:00", "Asia/Seoul").toISOString()).toBe("2026-10-06T15:00:00.000Z");
+    expect(zonedTimeToUtc("2026-10-07", "23:59:59", "Asia/Seoul").toISOString()).toBe("2026-10-07T14:59:59.000Z");
+    // 서머타임: 뉴욕은 3월 8일 새벽 2시에 시계를 앞당긴다 (그 전 UTC-5, 그 후 UTC-4)
+    expect(zonedTimeToUtc("2026-03-08", "00:00:00", "America/New_York").toISOString()).toBe("2026-03-08T05:00:00.000Z");
+    expect(zonedTimeToUtc("2026-03-08", "23:59:59", "America/New_York").toISOString()).toBe("2026-03-09T03:59:59.000Z");
+    expect(zonedTimeToUtc("2026-07-01", "12:00:00", "UTC").toISOString()).toBe("2026-07-01T12:00:00.000Z");
+  });
+
+  it("시간대 이름 검사", () => {
+    expect(isValidTimeZone("Asia/Seoul")).toBe(true);
+    expect(isValidTimeZone("America/Los_Angeles")).toBe(true);
+    expect(isValidTimeZone("Seoul")).toBe(false);
+    expect(isValidTimeZone("")).toBe(false);
   });
 });
 

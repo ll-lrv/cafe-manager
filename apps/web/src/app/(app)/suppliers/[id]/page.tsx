@@ -15,7 +15,7 @@ import { ArchiveSupplierButton, SupplierForm } from "../supplier-forms";
 
 export const metadata: Metadata = { title: "거래처 정보" };
 
-const dateFormat = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone: "Asia/Seoul" });
+const dateFormat = (timeZone: string) => new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone });
 
 export default async function SupplierPage({ params }: PageProps<"/suppliers/[id]">) {
   const [{ id }, store] = await Promise.all([params, requireCurrentStore()]);
@@ -65,7 +65,7 @@ export default async function SupplierPage({ params }: PageProps<"/suppliers/[id
                 <li key={o.id}>
                   <Link href={`/orders/${o.id}`} className="flex items-center gap-2 py-2 text-sm hover:underline">
                     <Badge variant={ORDER_STATUS[o.status].variant}>{ORDER_STATUS[o.status].label}</Badge>
-                    <span>{dateFormat.format(new Date(o.orderedAt ?? o.createdAt))}</span>
+                    <span>{dateFormat(store.timeZone).format(new Date(o.orderedAt ?? o.createdAt))}</span>
                     <span className="text-muted-foreground">품목 {o.lines.length}개</span>
                     <span className="ml-auto tabular-nums">{won(orderTotal(o.lines))}</span>
                   </Link>

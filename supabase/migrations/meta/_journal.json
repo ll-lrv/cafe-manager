@@ -92,6 +92,20 @@
       "when": 1791261837634,
       "tag": "20261006044357_purchasing_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791367329306,
+      "tag": "20261007100209_store_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791367554301,
+      "tag": "20261007100554_sale_cancel_broadcast",
+      "breakpoints": true
     }
   ]
 }

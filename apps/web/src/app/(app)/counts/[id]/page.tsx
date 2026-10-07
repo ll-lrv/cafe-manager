@@ -14,14 +14,15 @@ import { StockCountRealtime } from "./count-realtime";
 
 export const metadata: Metadata = { title: "재고 실사" };
 
-const dateFormat = new Intl.DateTimeFormat("ko-KR", {
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Seoul",
-});
+const dateFormat = (timeZone: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  });
 
 function fmt(line: StockCountLine, n: number) {
   return formatQuantity(n, line.baseUnit, line.units.find((u) => u.isDefaultPurchase) ?? null);
@@ -84,10 +85,10 @@ export default async function CountPage({ params }: PageProps<"/counts/[id]">) {
           <Badge variant={STATUS_BADGE[count.status].variant}>{STATUS_BADGE[count.status].label}</Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          {dateFormat.format(new Date(count.startedAt))} 시작
+          {dateFormat(store.timeZone).format(new Date(count.startedAt))} 시작
           {count.createdByName && ` · ${count.createdByName}`}
           {count.completedAt &&
-            ` · ${dateFormat.format(new Date(count.completedAt))} ${count.status === "completed" ? "완료" : "취소"}`}
+            ` · ${dateFormat(store.timeZone).format(new Date(count.completedAt))} ${count.status === "completed" ? "완료" : "취소"}`}
           {count.completedByName && ` · ${count.completedByName}`}
           {count.memo && ` · ${count.memo}`}
         </p>

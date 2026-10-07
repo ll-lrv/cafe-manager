@@ -24,14 +24,15 @@ import { dayLabel, ORDER_STATUS, won } from "../status";
 
 export const metadata: Metadata = { title: "발주서" };
 
-const dateTimeFormat = new Intl.DateTimeFormat("ko-KR", {
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Seoul",
-});
+const dateTimeFormat = (timeZone: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  });
 
 export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
   const [{ id }, store] = await Promise.all([params, requireCurrentStore()]);
@@ -79,8 +80,8 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
         </div>
         <p className="text-sm text-muted-foreground">
           {order.orderedAt
-            ? `${dateTimeFormat.format(new Date(order.orderedAt))} 발주`
-            : `${dateTimeFormat.format(new Date(order.createdAt))} 작성`}
+            ? `${dateTimeFormat(store.timeZone).format(new Date(order.orderedAt))} 발주`
+            : `${dateTimeFormat(store.timeZone).format(new Date(order.createdAt))} 작성`}
           {order.createdByName && ` · ${order.createdByName}`}
           {order.expectedOn && ` · ${dayLabel(order.expectedOn)} 입고 예정`}
         </p>

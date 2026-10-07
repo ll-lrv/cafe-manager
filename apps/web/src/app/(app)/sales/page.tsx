@@ -18,7 +18,7 @@ const dateLabel = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeri
 
 export default async function SalesPage({ searchParams }: PageProps<"/sales">) {
   const [{ date: dateParam }, store] = await Promise.all([searchParams, requireCurrentStore()]);
-  const today = storeToday();
+  const today = storeToday(store.timeZone);
   // 미래 날짜나 잘못된 값은 오늘로
   const date = isValidDate(dateParam) && dateParam <= today ? dateParam : today;
   const isToday = date === today;
@@ -27,7 +27,7 @@ export default async function SalesPage({ searchParams }: PageProps<"/sales">) {
     listMenus(store.storeId),
     listItems(store.storeId),
     getStockLevels(store.storeId),
-    listSales(store.storeId, storeDayRange(date)),
+    listSales(store.storeId, storeDayRange(date, store.timeZone)),
   ]);
 
   const activeMenus = menus.filter((m) => !m.archivedAt);
@@ -153,7 +153,7 @@ export default async function SalesPage({ searchParams }: PageProps<"/sales">) {
               )}
             </CardHeader>
             <CardContent>
-              <SaleList sales={sales} canCancel={can(store.role, "sale:cancel")} />
+              <SaleList sales={sales} canCancel={can(store.role, "sale:cancel")} timeZone={store.timeZone} />
             </CardContent>
           </Card>
         </div>

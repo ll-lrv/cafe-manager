@@ -221,12 +221,18 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 | `*_set_updated_at` → `set_updated_at()` | `..._catalog_triggers.sql` | items, suppliers, menus, purchase_orders 수정 시 `updated_at` 갱신 | **유지 권장.** Drizzle `$onUpdate` 만으로는 SQL 직접 수정 시 갱신되지 않는다 |
 | `items_prevent_base_unit_change` | `..._catalog_triggers.sql` | 입출고·레시피에 쓰인 품목의 기본 단위 변경 차단 | **유지 권장** (데이터 무결성 규칙). 서비스에서도 같은 확인을 해서 친절한 오류를 먼저 낸다 |
 | `stock_count_lines_set_counted` → `set_stock_count_line_counted()` | `..._stock_count_functions.sql` | 센 수량이 바뀌면 센 시각·센 사람 기록 (지우면 둘 다 null) | 서비스에서 같은 값을 직접 기록하거나 트리거 유지 |
+| `stores_validate` → `validate_store()` | `..._store_settings.sql` | 매장 이름 앞뒤 공백 제거·1~50자, 시간대가 `pg_timezone_names` 에 있는지 확인 (만들기·수정 모두) | **유지 권장.** 잘못된 시간대가 들어가면 모든 화면의 날짜 계산이 깨진다. 서비스에서도 core `isValidTimeZone` 으로 먼저 확인 |
+| `sale_records_broadcast_cancel` → `broadcast_sale_cancelled()` | `..._sale_cancel_broadcast.sql` | 판매가 지워지면 비공개 Realtime 채널 `store:<매장 id>` 로 `sale_cancelled` 방송 | 판매 취소 서비스가 게이트웨이로 직접 알리고 트리거·`realtime.messages` 정책을 지운다 |
+
+함께 바뀐 권한
+- `stores`: 사장이 `name`·`timezone` 만 수정 (컬럼 권한, 정책 `stores_update`). 화면은 `/settings/store` (`store:manage`), API는 `stores.ts` `updateStore()` — 한 행이라 함수 없이 직접 쓴다
+- `realtime.messages`: 정책 `store_members_receive_broadcast` — `store:<id>` 채널은 그 매장 구성원만 받는다. 보내기 정책은 없어 브라우저에서는 보낼 수 없다
 
 ## Supabase 전용 기능 (DB 함수 외)
 
 | 기능 | 위치 | 하는 일 | NestJS 전환 시 |
 |---|---|---|---|
-| Realtime 구독 | `apps/web/src/lib/api/realtime.ts` `subscribeStoreChanges()` → `components/realtime-refresh.tsx`, `subscribeStockCount()` → 실사 화면 | `stock_movements`, `items` 변경과 `sale_records` 추가(내 매장, RLS 적용)를 받아 화면을 새로고침. 필터가 걸린 구독에는 삭제 이벤트가 오지 않는다 | 원장 기록·품목 변경 후 서비스가 이벤트를 내고, WebSocket/SSE 게이트웨이로 매장별 방송. `subscribeStoreChanges` 의 시그니처(매장 ID, 콜백 → 구독 해제 함수)는 그대로 두고 안만 바꾼다 |
+| Realtime 구독 | `apps/web/src/lib/api/realtime.ts` `subscribeStoreChanges()` → `components/realtime-refresh.tsx`, `subscribeStockCount()` → 실사 화면 | `stock_movements`, `items` 변경과 `sale_records` 추가(내 매장, RLS 적용)를 받아 화면을 새로고침. 필터가 걸린 구독에는 삭제 이벤트가 오지 않아, 판매 취소는 DB 트리거가 비공개 채널 `store:<id>` 로 방송한 것을 받는다 | 원장 기록·품목 변경 후 서비스가 이벤트를 내고, WebSocket/SSE 게이트웨이로 매장별 방송. `subscribeStoreChanges` 의 시그니처(매장 ID, 콜백 → 구독 해제 함수)는 그대로 두고 안만 바꾼다 |
 | 구독 대상 테이블 | `..._supabase_auth_rls.sql`, `..._record_sales.sql`, `..._stock_count_realtime.sql` 의 `ALTER PUBLICATION supabase_realtime` | stock_movements, items, sale_records, stock_count_lines 방송 | 게이트웨이로 옮기면 publication 에서 뺀다 |
 | 재고 집계 뷰 | `item_stock_levels`, `lot_stock_levels`, `item_latest_costs` (`inventory.ts`), `stock_count_line_books` (`counts.ts`) | 원장 합계로 현재 재고·로트 잔량, 품목별 최근 입고 단가(메뉴 원가용), 실사 줄의 센 시각 장부 | 뷰는 그대로 쓴다 (PostgreSQL 뷰, `security_invoker`) |
 

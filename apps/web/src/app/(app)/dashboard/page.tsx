@@ -33,14 +33,14 @@ function MoreLink({ href, total }: { href: string; total: number }) {
 
 export default async function DashboardPage() {
   const [user, store] = await Promise.all([requireUser(), requireCurrentStore()]);
-  const today = storeToday();
+  const today = storeToday(store.timeZone);
   const canPurchase = can(store.role, "purchase:manage");
   const [items, stock, lotLevels, movements, todaySales, counts, incoming] = await Promise.all([
     listItems(store.storeId),
     getStockLevels(store.storeId),
     listLotLevels(store.storeId),
     listMovements(store.storeId, { limit: 5 }),
-    listSales(store.storeId, storeDayRange(today)),
+    listSales(store.storeId, storeDayRange(today, store.timeZone)),
     listStockCounts(store.storeId, 1),
     canPurchase ? listPurchaseOrders(store.storeId, { statuses: ["ordered", "partially_received"] }) : Promise.resolve([]),
   ]);
@@ -233,7 +233,7 @@ export default async function DashboardPage() {
               </CardAction>
             </CardHeader>
             <CardContent>
-              <MovementList movements={movements} />
+              <MovementList movements={movements} timeZone={store.timeZone} />
             </CardContent>
           </Card>
         </div>

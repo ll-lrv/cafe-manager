@@ -170,12 +170,13 @@ export function SalesForm({ menus, items, stock, date, isToday }: {
   );
 }
 
-const timeFormat = new Intl.DateTimeFormat("ko-KR", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Seoul",
-});
+const timeFormat = (timeZone: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  });
 
 function CancelSaleButton({ sale }: { sale: Sale }) {
   return (
@@ -193,7 +194,7 @@ function CancelSaleButton({ sale }: { sale: Sale }) {
   );
 }
 
-export function SaleList({ sales, canCancel }: { sales: Sale[]; canCancel: boolean }) {
+export function SaleList({ sales, canCancel, timeZone }: { sales: Sale[]; canCancel: boolean; timeZone: string }) {
   if (sales.length === 0) {
     return <p className="py-6 text-center text-sm text-muted-foreground">이 날 판매 기록이 없습니다.</p>;
   }
@@ -205,7 +206,7 @@ export function SaleList({ sales, canCancel }: { sales: Sale[]; canCancel: boole
           <span className="text-sm tabular-nums">{sale.quantity.toLocaleString("ko-KR")}개</span>
           <span className="text-sm text-muted-foreground tabular-nums">{won(sale.amount)}</span>
           <span className="w-full text-xs text-muted-foreground sm:w-auto">
-            {timeFormat.format(new Date(sale.soldAt))}
+            {timeFormat(timeZone).format(new Date(sale.soldAt))}
             {sale.createdByName && ` · ${sale.createdByName}`}
           </span>
           {canCancel && (

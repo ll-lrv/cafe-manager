@@ -90,6 +90,13 @@
   `useFormAction` 은 액션 결과 타입을 제네릭으로 받는다 (초대의 `token` 처럼 추가 필드가 있는 결과)
 - `@cafe/core`, `@cafe/db` 에 lint 스크립트 (`@eslint/js` + `typescript-eslint` 권장 규칙). `pnpm lint` 가 세 패키지를 모두 검사
 - 확인: typecheck·lint·단위 테스트 21개, 전체 E2E 218개 통과 (가입·초대에 입력값 유지·메모 비움 2개 추가)
+- 매장 시간대·매장 설정 (`/settings/store`, 사장)
+  - "오늘", 하루 범위, 지난 날짜 판매의 23:59, 화면의 날짜·시각 표시가 모두 `stores.timezone` 을 따른다 (그동안 Asia/Seoul 고정)
+  - core `time.ts`: `zonedTimeToUtc`(서머타임 반영), `isValidTimeZone`, `dateInTimeZone`(옮김). 테스트 23개
+  - DB: 사장은 `name`·`timezone` 만 수정(컬럼 권한), 트리거 `validate_store` 가 이름·시간대 검사
+- 판매 취소 실시간 반영: 트리거가 `realtime.send` 로 비공개 채널 `store:<id>` 에 방송, `realtime.messages` 정책으로 그 매장 구성원만 수신
+  - 확인: 트리거를 끄면 E2E 가 실패하는 것, 다른 사람은 채널 메시지를 못 읽는 것(SQL)
+- E2E: `store` 시나리오 추가(호놀룰루 시간대로 바꿔 판매 날짜 확인), 판매 시나리오에 취소 실시간 반영. 8개 통과
 - E2E 를 `@playwright/test` 로 전환 (`e2e/tests/*.spec.ts`)
   - 공통 fixture `app`: 가입+매장(`owner`), 초대로 직원 가입(`joinByInvite`), 다른 기기(`newPage`), 페이지·콘솔 오류 수집
   - 도우미(`helpers.ts`): 품목·메뉴·레시피·입출고·판매, 실시간 반영 확인. 시나리오마다 복사돼 있던 것을 하나로
@@ -119,8 +126,9 @@
 
 재고관리 MVP(품목·입출고·재고 현황·메뉴/판매·실사·발주)는 끝났다. 다음 단계 후보:
 
-1. **MVP 다듬기**
-   - 매장 시간대를 설정으로 (지금은 Asia/Seoul 고정, `lib/inventory.ts`)
+1. **MVP 다듬기** (남은 것)
+   - `pnpm db:reset` 으로 마이그레이션 15개를 처음부터 적용해 확인 (로컬 데이터가 모두 지워진다)
+   - 원격 git 저장소 연결, 배포 환경(Supabase 클라우드 + Vercel 등) 결정, E2E CI 연결
 2. **매출 연동**: CSV 업로드 → `record_sales` 를 `source = 'csv'`, `external_id` 로 중복 방지하며 호출. 이후 POS 연동
 3. **분석**: 기간별 매출·원가·마진, 메뉴별 원가율 추이, 재료 소모·폐기율
 4. **NestJS 전환 시작**: `docs/db-functions.md` 의 대응표대로 기능 단위로 옮긴다

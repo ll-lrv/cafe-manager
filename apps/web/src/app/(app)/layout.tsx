@@ -22,6 +22,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   ];
   if (can(store.role, "purchase:manage")) nav.push({ href: "/orders", label: "발주" });
   if (can(store.role, "member:manage")) nav.push({ href: "/settings/members", label: "직원 관리" });
+  if (can(store.role, "store:manage")) nav.push({ href: "/settings/store", label: "매장 설정" });
 
   return (
     <div className="flex flex-1 flex-col">

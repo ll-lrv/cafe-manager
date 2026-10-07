@@ -24,11 +24,3 @@ export function expiryLabel(daysLeft: number): string {
   if (daysLeft === 0) return "오늘까지";
   return `D-${daysLeft}`;
 }
-
-/**
- * 그 시간대 기준 날짜(YYYY-MM-DD). 서버가 어느 시간대에서 돌든 매장 기준 "오늘"을 구할 때 쓴다.
- * 예) dateInTimeZone(new Date(), "Asia/Seoul")
- */
-export function dateInTimeZone(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
-}

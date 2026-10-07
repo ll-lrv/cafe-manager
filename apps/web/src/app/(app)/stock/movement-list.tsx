@@ -11,14 +11,15 @@ const TYPE_BADGE: Record<MovementType, { label: string; variant: React.Component
   adjust: { label: "조정", variant: "outline" },
 };
 
-const dateFormat = new Intl.DateTimeFormat("ko-KR", {
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Seoul",
-});
+const dateFormat = (timeZone: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  });
 
 /** "+2봉 (2,000g)" 또는 "−500g" */
 function quantityText(m: Movement) {
@@ -41,16 +42,26 @@ function priceText(m: Movement) {
   return `단가 ${roundQty(m.unitCost).toLocaleString("ko-KR")}원`;
 }
 
-export function MovementList({ movements, showItem = true }: { movements: Movement[]; showItem?: boolean }) {
+export function MovementList({
+  movements,
+  timeZone,
+  showItem = true,
+}: {
+  movements: Movement[];
+  /** 매장 시간대 (기록 시각 표시) */
+  timeZone: string;
+  showItem?: boolean;
+}) {
   if (movements.length === 0) {
     return <p className="py-6 text-center text-sm text-muted-foreground">아직 기록이 없습니다.</p>;
   }
+  const date = dateFormat(timeZone);
   return (
     <ul className="divide-y">
       {movements.map((m) => {
         const badge = TYPE_BADGE[m.type];
         const details = [
-          dateFormat.format(new Date(m.occurredAt)),
+          date.format(new Date(m.occurredAt)),
           m.createdByName,
           m.expiresOn && `유통기한 ${m.expiresOn}`,
           priceText(m),

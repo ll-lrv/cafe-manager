@@ -5,29 +5,27 @@ import {
   stockStatus,
   type ExpiryStatus,
   type StockStatus,
+  zonedTimeToUtc,
 } from "@cafe/core";
 import type { Category, Item } from "@/lib/api/catalog";
 import type { LotLevel } from "@/lib/api/stock";
 
-/** 매장 기준 시간대. 유통기한 "오늘"을 이 시간대로 센다. (매장별 설정은 나중에) */
-export const STORE_TIME_ZONE = "Asia/Seoul";
-
-/** STORE_TIME_ZONE 의 UTC 차이. 한국은 서머타임이 없어 고정이다. */
-const STORE_UTC_OFFSET = "+09:00";
-
-export function storeToday(): string {
-  return dateInTimeZone(new Date(), STORE_TIME_ZONE);
+/** 매장 시간대 기준 오늘 (YYYY-MM-DD) */
+export function storeToday(timeZone: string): string {
+  return dateInTimeZone(new Date(), timeZone);
 }
 
-/** 매장 기준 하루(YYYY-MM-DD)의 시작~다음 날 시작 (ISO) */
-export function storeDayRange(date: string): { from: string; to: string } {
-  const from = new Date(`${date}T00:00:00${STORE_UTC_OFFSET}`);
-  return { from: from.toISOString(), to: new Date(from.getTime() + 86_400_000).toISOString() };
+/** 매장 시간대 기준 하루(YYYY-MM-DD)의 시작~다음 날 시작 (ISO). 서머타임이 있는 곳은 23·25시간일 수 있다. */
+export function storeDayRange(date: string, timeZone: string): { from: string; to: string } {
+  return {
+    from: zonedTimeToUtc(date, "00:00:00", timeZone).toISOString(),
+    to: zonedTimeToUtc(addDays(date, 1), "00:00:00", timeZone).toISOString(),
+  };
 }
 
-/** 매장 기준 그 날의 마지막 순간 (지난 날짜의 판매를 하루 마감으로 입력할 때) */
-export function storeEndOfDay(date: string): string {
-  return new Date(`${date}T23:59:59${STORE_UTC_OFFSET}`).toISOString();
+/** 매장 시간대 기준 그 날의 마지막 순간 (지난 날짜의 판매를 하루 마감으로 입력할 때) */
+export function storeEndOfDay(date: string, timeZone: string): string {
+  return zonedTimeToUtc(date, "23:59:59", timeZone).toISOString();
 }
 
 /** YYYY-MM-DD 에 n일 더하기 */

@@ -8,9 +8,12 @@ export function check(label: string, ok: boolean, detail?: unknown) {
 /** 화면 본문 텍스트 */
 export const main = (page: Page) => page.locator("main").innerText();
 
-/** 한국 기준 오늘 + n일 (YYYY-MM-DD) */
-export const kstDate = (n: number) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(Date.now() + n * 86_400_000));
+/** 그 시간대 기준 오늘 + n일 (YYYY-MM-DD) */
+export const zonedDate = (timeZone: string, n: number) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date(Date.now() + n * 86_400_000));
+
+/** 한국(매장 기본 시간대) 기준 오늘 + n일 (YYYY-MM-DD) */
+export const kstDate = (n: number) => zonedDate("Asia/Seoul", n);
 
 /** 주소 끝의 ID (`/items/<id>?created=1` → `<id>`) */
 export function idFromUrl(url: string): string {
@@ -32,11 +35,16 @@ export async function shot(page: Page, name: string) {
 export const waitForRealtime = (page: Page) => page.waitForTimeout(1500);
 
 /** 다른 기기에서 바꾼 내용이 새로고침 없이 화면에 나타나는지 (실시간 반영 확인) */
-export async function appearsLive(page: Page, text: string, selector = "main") {
+export const appearsLive = (page: Page, text: string, selector = "main") => waitLive(page, text, selector, true);
+
+/** 다른 기기에서 바꾼 내용 때문에 새로고침 없이 화면에서 사라지는지 (예: 판매 취소) */
+export const disappearsLive = (page: Page, text: string, selector = "main") => waitLive(page, text, selector, false);
+
+async function waitLive(page: Page, text: string, selector: string, present: boolean) {
   try {
     await page.waitForFunction(
-      ([sel, t]) => (document.querySelector(sel) as HTMLElement | null)?.innerText.includes(t) ?? false,
-      [selector, text] as const,
+      ([sel, t, want]) => ((document.querySelector(sel) as HTMLElement | null)?.innerText.includes(t) ?? false) === want,
+      [selector, text, present] as const,
       { timeout: 8000 },
     );
     return true;

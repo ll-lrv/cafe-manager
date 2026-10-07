@@ -36,7 +36,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
   const quantity = stock[item.id] ?? 0;
   const defaultUnit = item.units.find((u) => u.isDefaultPurchase) ?? null;
   const fmt = (n: number) => formatQuantity(n, item.baseUnit, defaultUnit);
-  const today = storeToday();
+  const today = storeToday(store.timeZone);
   const lots = lotLevels.map((l) => toLotView(l, today));
   // 로트 없이 들어오고 나간 양 (유통기한 관리를 나중에 켰거나, 로트보다 많이 쓴 경우)
   const withoutLot = roundQty(quantity - lots.reduce((sum, l) => sum + l.quantity, 0));
@@ -107,7 +107,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
                 </ul>
               </section>
             )}
-            <MovementList movements={movements} showItem={false} />
+            <MovementList movements={movements} timeZone={store.timeZone} showItem={false} />
             {movements.length === 10 && (
               <Link href={`/stock?item=${item.id}`} className="block text-sm text-muted-foreground hover:underline">
                 기록 더 보기

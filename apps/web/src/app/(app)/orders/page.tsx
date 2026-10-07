@@ -13,9 +13,10 @@ import { dayLabel, OPEN_STATUSES, ORDER_STATUS, won } from "./status";
 
 export const metadata: Metadata = { title: "발주" };
 
-const dateFormat = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone: "Asia/Seoul" });
+const dateFormat = (timeZone: string) => new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone });
 
-function OrderRow({ order, today }: { order: PurchaseOrder; today: string }) {
+function OrderRow({ order, today, timeZone }: { order: PurchaseOrder; today: string; timeZone: string }) {
+  const date = dateFormat(timeZone);
   const status = ORDER_STATUS[order.status];
   const late = order.expectedOn && order.expectedOn < today && (order.status === "ordered" || order.status === "partially_received");
   return (
@@ -28,7 +29,7 @@ function OrderRow({ order, today }: { order: PurchaseOrder; today: string }) {
             {late && <Badge variant="destructive">입고 예정일 지남</Badge>}
           </div>
           <p className="truncate text-xs text-muted-foreground">
-            {order.orderedAt ? `${dateFormat.format(new Date(order.orderedAt))} 발주` : `${dateFormat.format(new Date(order.createdAt))} 작성`}
+            {order.orderedAt ? `${date.format(new Date(order.orderedAt))} 발주` : `${date.format(new Date(order.createdAt))} 작성`}
             {order.expectedOn && ` · ${dayLabel(order.expectedOn)} 입고 예정`}
             {` · ${order.lines.map((l) => l.itemName).join(", ") || "품목 없음"}`}
           </p>
@@ -46,7 +47,7 @@ export default async function OrdersPage() {
     return <p className="text-sm text-muted-foreground">발주는 사장과 매니저만 할 수 있습니다.</p>;
   }
   const orders = await listPurchaseOrders(store.storeId);
-  const today = storeToday();
+  const today = storeToday(store.timeZone);
   const open = orders.filter((o) => OPEN_STATUSES.includes(o.status));
   const closed = orders.filter((o) => !OPEN_STATUSES.includes(o.status));
 
@@ -81,7 +82,7 @@ export default async function OrdersPage() {
           ) : (
             <ul className="divide-y">
               {open.map((o) => (
-                <OrderRow key={o.id} order={o} today={today} />
+                <OrderRow key={o.id} order={o} today={today} timeZone={store.timeZone} />
               ))}
             </ul>
           )}
@@ -96,7 +97,7 @@ export default async function OrdersPage() {
           <CardContent className="px-0">
             <ul className="divide-y">
               {closed.map((o) => (
-                <OrderRow key={o.id} order={o} today={today} />
+                <OrderRow key={o.id} order={o} today={today} timeZone={store.timeZone} />
               ))}
             </ul>
           </CardContent>

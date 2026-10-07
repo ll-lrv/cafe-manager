@@ -3,6 +3,7 @@ import { expect, MOBILE, test } from "../fixtures";
 import {
   addIngredient,
   appearsLive,
+  disappearsLive,
   check,
   createItem,
   createMenu,
@@ -182,6 +183,16 @@ test("메뉴·레시피·판매 입력", async ({ app }) => {
     const text = await main(p);
     check("대시보드 오늘 매출 15,000원 · 3개", text.includes("15,000원") && text.includes("3개 판매"));
     check("곧 추가될 기능에서 메뉴·판매 빠짐", !text.includes("레시피 등록, 판매 입력 시"));
+  });
+
+  await test.step("6-1. 실시간: 사장이 판매를 취소하면 직원 화면에 바로 반영", async () => {
+    await s.goto("/sales");
+    await waitForRealtime(s);
+    check("취소 전 직원 화면 매출 15,000원", (await main(s)).includes("15,000원"));
+    await p.goto("/sales");
+    await p.getByRole("button", { name: "라떼 판매 취소" }).first().click();
+    await p.getByText("판매를 취소했습니다.").waitFor();
+    check("실시간: 취소가 직원 화면 매출에 반영 (15,000원이 바뀜)", await disappearsLive(s, "15,000원"));
   });
 
   await test.step("7. 메뉴 보관 → 판매 입력에서 빠짐", async () => {

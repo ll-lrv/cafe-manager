@@ -19,7 +19,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
     getStockLevels(store.storeId),
     listLotLevels(store.storeId),
   ]);
-  const levels = buildItemLevels(items, stock, lots, storeToday());
+  const levels = buildItemLevels(items, stock, lots, storeToday(store.timeZone));
   const initialStatus: StatusFilter = status === "low" || status === "expiry" ? status : "all";
   const canManage = can(store.role, "catalog:manage");
 

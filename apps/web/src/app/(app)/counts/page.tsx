@@ -13,15 +13,16 @@ import { STATUS_BADGE } from "./status";
 
 export const metadata: Metadata = { title: "재고 실사" };
 
-const dateFormat = new Intl.DateTimeFormat("ko-KR", {
-  month: "numeric",
-  day: "numeric",
-  weekday: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Seoul",
-});
+const dateFormat = (timeZone: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  });
 
 export default async function CountsPage() {
   const store = await requireCurrentStore();
@@ -55,7 +56,7 @@ export default async function CountsPage() {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              {dateFormat.format(new Date(inProgress.startedAt))} 시작
+              {dateFormat(store.timeZone).format(new Date(inProgress.startedAt))} 시작
               {inProgress.createdByName && ` · ${inProgress.createdByName}`}
               {inProgress.memo && ` · ${inProgress.memo}`}
             </p>
@@ -97,7 +98,7 @@ export default async function CountsPage() {
                         {c.memo && ` · ${c.memo}`}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {dateFormat.format(new Date(c.startedAt))} · {c.countedCount}개 셈
+                        {dateFormat(store.timeZone).format(new Date(c.startedAt))} · {c.countedCount}개 셈
                         {c.status === "completed" && ` · ${c.adjustedCount}개 조정`}
                       </span>
                     </div>
