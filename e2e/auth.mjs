@@ -60,6 +60,7 @@ try {
   await linkInput.waitFor();
   const inviteUrl = await linkInput.inputValue();
   check("초대 링크 생성", /\/invite\/[0-9a-f]{32}$/.test(inviteUrl), inviteUrl);
+  check("초대 링크를 만들면 메모 칸 비움", (await owner.page.inputValue("#invite-email")) === "");
   await owner.page.getByText("대기 중인 초대 1건").waitFor();
   check("대기 중인 초대 목록에 표시", true);
   await owner.page.screenshot({ path: `${SHOTS}04-members-invite.png`, fullPage: true });
@@ -111,6 +112,11 @@ try {
   await staff.page.getByRole("button", { name: "로그인", exact: true }).click();
   await staff.page.getByText("이메일 또는 비밀번호가 올바르지 않습니다.").waitFor();
   check("잘못된 비밀번호 안내 메시지", true);
+  check(
+    "로그인 실패 후 입력값 유지",
+    (await staff.page.inputValue("#login-email")) === `staff${stamp}@test.kr` &&
+      (await staff.page.inputValue("#login-password")) === "wrongpass",
+  );
 
   // 8. 휴대폰 화면
   const mobile = await browser.newContext({ ...{ viewport: { width: 390, height: 844 } }, storageState: await owner.ctx.storageState() });

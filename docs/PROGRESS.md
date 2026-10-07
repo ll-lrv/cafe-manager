@@ -84,6 +84,13 @@
 - `useFormAction` 에 `toastResult` 옵션: 성공하면 폼이 사라지는 곳(입고 완료)에서도 알림이 뜨도록
 - 확인: SQL 검증 + 브라우저 E2E 41개, 전체 E2E 회귀 197개 통과
 
+### 9. MVP 다듬기 (진행 중)
+- 브라우저 E2E 스크립트를 저장소 `e2e/` 로 옮김 (`pnpm e2e`)
+- 로그인·회원가입·매장 만들기·직원 초대 폼을 `useFormAction` 으로: 오류가 나도 입력값 유지, 초대 링크를 만들면 메모 칸 비움.
+  `useFormAction` 은 액션 결과 타입을 제네릭으로 받는다 (초대의 `token` 처럼 추가 필드가 있는 결과)
+- `@cafe/core`, `@cafe/db` 에 lint 스크립트 (`@eslint/js` + `typescript-eslint` 권장 규칙). `pnpm lint` 가 세 패키지를 모두 검사
+- 확인: typecheck·lint·단위 테스트 21개, 전체 E2E 218개 통과 (가입·초대에 입력값 유지·메모 비움 2개 추가)
+
 ## 다시 시작하는 방법
 
 1. **Docker Desktop 실행** (`%LOCALAPPDATA%\Programs\DockerDesktop\Docker Desktop.exe`)
@@ -106,9 +113,7 @@
 재고관리 MVP(품목·입출고·재고 현황·메뉴/판매·실사·발주)는 끝났다. 다음 단계 후보:
 
 1. **MVP 다듬기**
-   - E2E 를 `@playwright/test` 로 정식 전환 (지금은 `e2e/` 의 Node 스크립트 7개, 216개 항목, `pnpm e2e`)
-   - 로그인·매장 만들기·직원 초대 폼도 `useFormAction` 으로 바꿔 오류 시 입력값 유지
-   - `@cafe/core`, `@cafe/db` 에 lint 스크립트 추가
+   - E2E 를 `@playwright/test` 로 정식 전환 (지금은 `e2e/` 의 Node 스크립트 7개, 218개 항목, `pnpm e2e`)
    - 매장 시간대를 설정으로 (지금은 Asia/Seoul 고정, `lib/inventory.ts`)
 2. **매출 연동**: CSV 업로드 → `record_sales` 를 `source = 'csv'`, `external_id` 로 중복 방지하며 호출. 이후 POS 연동
 3. **분석**: 기간별 매출·원가·마진, 메뉴별 원가율 추이, 재료 소모·폐기율

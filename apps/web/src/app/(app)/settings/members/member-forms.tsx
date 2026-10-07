@@ -4,7 +4,15 @@ import { ROLE_LABEL, type MemberRole } from "@cafe/core";
 import { Check, Copy } from "lucide-react";
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
-import { ActionButton, Field, FormMessage, NativeSelect, SubmitButton, useToastResult } from "@/components/form-parts";
+import {
+  ActionButton,
+  Field,
+  FormMessage,
+  NativeSelect,
+  SubmitButton,
+  useFormAction,
+  useToastResult,
+} from "@/components/form-parts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,11 +51,11 @@ export function CopyLinkButton({ token }: { token: string }) {
 }
 
 export function InviteForm() {
-  const [state, action] = useActionState(inviteAction, undefined);
+  const { state, pending, formProps } = useFormAction(inviteAction, { resetOnSuccess: true });
 
   return (
     <div className="grid gap-4">
-      <form action={action} className="grid gap-3 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
+      <form {...formProps} className="grid gap-3 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
         <Field label="역할" htmlFor="invite-role">
           <NativeSelect id="invite-role" name="role" defaultValue="staff">
             <option value="staff">{ROLE_LABEL.staff}</option>
@@ -57,7 +65,9 @@ export function InviteForm() {
         <Field label="메모 (선택)" htmlFor="invite-email">
           <Input id="invite-email" name="email" placeholder="받는 사람 이메일 또는 이름" maxLength={100} />
         </Field>
-        <SubmitButton pendingText="만드는 중…">초대 링크 만들기</SubmitButton>
+        <SubmitButton pending={pending} pendingText="만드는 중…">
+          초대 링크 만들기
+        </SubmitButton>
       </form>
       {state?.error && <FormMessage state={state} />}
       {state?.token && (

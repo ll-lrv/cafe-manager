@@ -209,7 +209,8 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `useToastResult(state)` | 결과를 알림으로 |
 | `SubmitButton`, `Field`, `NativeSelect`, `FormMessage` | 기본 부품 (모바일 안정성 때문에 select 는 네이티브) |
 
-아직 `useFormAction` 으로 바꾸지 않은 폼: 로그인, 매장 만들기, 직원 초대.
+입력칸이 있는 폼은 모두 `useFormAction` 을 쓴다. (초대 수락·역할 변경처럼 입력칸이 없거나 select 하나뿐인 폼은 `useActionState` 그대로)
+결과에 추가 필드가 있으면 액션의 반환 타입이 그대로 `state` 타입이 된다 (예: 직원 초대의 `token`).
 
 ### Supabase 클라이언트
 - **Realtime 은 구독 전에 `supabase.realtime.setAuth(access_token)` 필요.** 브라우저 클라이언트가 쿠키 세션 토큰을 실시간 연결에 자동으로 넣지 않아, 안 넣으면 익명으로 구독되어 RLS 에 막히고 이벤트가 오지 않는다 (`lib/api/realtime.ts` 의 `subscribe`).
@@ -229,9 +230,9 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | 종류 | 상태 |
 |---|---|
 | core 단위 테스트 (vitest) | 21개, `pnpm test` |
-| 타입·lint | `pnpm typecheck`, `pnpm lint` 통과. 단 lint 는 `apps/web` 만 (core·db 에 lint 스크립트 없음) |
+| 타입·lint | `pnpm typecheck`, `pnpm lint` 통과 (lint: `apps/web` 은 Next 규칙, `core`·`db` 는 `typescript-eslint` 권장 규칙) |
 | DB 함수 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
-| 브라우저 E2E | `e2e/` 7개 시나리오, **216개 항목 통과** (가입·초대 19, 품목 49, 입출고 28, 재고 현황 20, 판매 36, 실사 23, 발주 41). `pnpm e2e` |
+| 브라우저 E2E | `e2e/` 7개 시나리오, **218개 항목 통과** (가입·초대 21, 품목 49, 입출고 28, 재고 현황 20, 판매 36, 실사 23, 발주 41). `pnpm e2e` |
 
 브라우저 E2E는 `playwright-core` 로 설치된 Chrome 을 직접 조작하는 Node 스크립트다 (`@playwright/test` 아님). 실행 방법·시나리오 설명은 `e2e/README.md`.
 실행할 때마다 새 계정·매장을 만들어 로컬 DB에 테스트 데이터가 쌓인다. CI에는 아직 연결하지 않았다.
@@ -244,8 +245,8 @@ E2E 중 `caret-color: transparent` hydration 경고가 보이면 Playwright 스�
 ### 1) MVP 다듬기 — 먼저 하길 권장
 - [x] E2E 스크립트를 저장소 `e2e/` 로 옮김 (`pnpm e2e`, 216개 항목)
 - [ ] E2E 를 `@playwright/test` 로 정식 전환: 중복된 도우미(가입, 품목·메뉴 만들기, 초대)를 공통 fixture 로, 리포트·재시도·병렬 실행. 테스트 데이터 정리 방법(전용 DB 또는 실행 후 정리)과 CI 연결도 정한다
-- [ ] 로그인·매장 만들기·직원 초대 폼을 `useFormAction` 으로 (오류 시 입력값 유지)
-- [ ] `@cafe/core`, `@cafe/db` 에 lint 스크립트
+- [x] 로그인·매장 만들기·직원 초대 폼을 `useFormAction` 으로 (오류 시 입력값 유지)
+- [x] `@cafe/core`, `@cafe/db` 에 lint 스크립트
 - [ ] `pnpm db:reset` 으로 마이그레이션 13개를 처음부터 적용해 확인 (로컬 테스트 계정은 지워진다)
 - [ ] 매장 시간대를 매장 설정으로 (지금 Asia/Seoul 고정), 매장 정보 화면(`store:manage`)
 - [ ] 판매 취소가 다른 기기에 바로 반영되게 (필터 없는 DELETE 구독 또는 취소 이벤트용 별도 방송)

@@ -106,11 +106,11 @@ export function useToastResult(state: ActionState) {
  * toastResult 면 액션이 끝난 자리에서 바로 알림을 띄운다. 성공하면 폼이 화면에서 사라지는 곳(예: 입고 완료)은
  * useToastResult 로는 결과와 함께 폼이 사라져 알림이 뜨지 않으므로 이것을 쓴다.
  */
-export function useFormAction(
-  action: (prev: ActionState, formData: FormData) => Promise<ActionState>,
+export function useFormAction<T extends NonNullable<ActionState> = NonNullable<ActionState>>(
+  action: (prev: T | undefined, formData: FormData) => Promise<T | undefined>,
   { resetOnSuccess = false, toastResult = false }: { resetOnSuccess?: boolean; toastResult?: boolean } = {},
 ) {
-  const [state, dispatch, pending] = useActionState(async (prev: ActionState, formData: FormData) => {
+  const [state, dispatch, pending] = useActionState<T | undefined, FormData>(async (prev, formData) => {
     const result = await action(prev, formData);
     if (toastResult) {
       if (result?.error) toast.error(result.error);
