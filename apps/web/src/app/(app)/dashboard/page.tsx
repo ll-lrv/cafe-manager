@@ -2,6 +2,7 @@ import { can, EXPIRY_SOON_DAYS, formatQuantity } from "@cafe/core";
 import { ArrowRightLeft, ClipboardList, Receipt } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ActionButton } from "@/components/form-parts";
 import { ExpiryBadge, StockStatusBadge } from "@/components/stock-badges";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import { requireUser } from "@/lib/api/session";
 import { buildItemLevels, storeDayRange, storeToday, toLotView } from "@/lib/inventory";
 import { dayLabel } from "../orders/status";
 import { MovementList } from "../stock/movement-list";
+import { applyTemplateAction } from "./actions";
 
 export const metadata: Metadata = { title: "대시보드" };
 
@@ -119,9 +121,16 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>품목을 등록해 주세요</CardTitle>
-            <CardDescription>원두, 우유, 컵처럼 재고로 관리할 물품을 등록하면 이곳에 재고 현황이 나타납니다.</CardDescription>
+            <CardDescription>
+              원두, 우유, 컵처럼 재고로 관리할 물품을 등록하면 이곳에 재고 현황이 나타납니다.
+              {can(store.role, "catalog:manage") &&
+                " 카페 기본 템플릿을 불러오면 자주 쓰는 품목과 메뉴·레시피가 한 번에 들어갑니다."}
+            </CardDescription>
             {can(store.role, "catalog:manage") && (
-              <CardAction>
+              <CardAction className="flex flex-wrap justify-end gap-2">
+                <ActionButton action={applyTemplateAction} fields={{}} pendingText="불러오는 중…">
+                  기본 템플릿 불러오기
+                </ActionButton>
                 <Link href="/items/new" className={buttonVariants({ variant: "outline" })}>
                   품목 추가
                 </Link>

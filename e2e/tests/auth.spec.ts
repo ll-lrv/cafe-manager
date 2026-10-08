@@ -16,6 +16,7 @@ test("가입·매장 만들기·직원 초대·권한", async ({ app }) => {
     await signup(o, "김사장", app.email("owner"));
     await o.waitForURL("**/onboarding");
     await o.fill("#store-name", storeName);
+    await o.uncheck("#store-template");
     await o.getByRole("button", { name: "매장 만들기" }).click();
     await o.waitForURL("**/dashboard");
     const header = await o.locator("header").innerText();

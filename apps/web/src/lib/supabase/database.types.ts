@@ -27,6 +27,7 @@ export type Database = {
                   Row: {
                     "created_at": string,"id": string,"name": string,"sort_order": number,"store_id": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"id"?: string,"name": string,"sort_order"?: number,"store_id": string
                   }
@@ -46,6 +47,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"factor": number,"id": string,"is_default_purchase": boolean,"item_id": string,"name": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"factor": number,"id"?: string,"is_default_purchase"?: boolean,"item_id": string,"name": string
                   }
@@ -71,6 +73,7 @@ isOneToOne: false
                   Row: {
                     "archived_at": string | null,"barcode": string | null,"base_unit": Database["public"]['Enums']["base_unit"],"category_id": string | null,"created_at": string,"default_supplier_id": string | null,"id": string,"memo": string | null,"min_stock": number,"name": string,"store_id": string,"track_expiry": boolean,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "archived_at"?: string | null,"barcode"?: string | null,"base_unit": Database["public"]['Enums']["base_unit"],"category_id"?: string | null,"created_at"?: string,"default_supplier_id"?: string | null,"id"?: string,"memo"?: string | null,"min_stock"?: number,"name": string,"store_id": string,"track_expiry"?: boolean,"updated_at"?: string
                   }
@@ -102,6 +105,7 @@ isOneToOne: false
                   Row: {
                     "archived_at": string | null,"created_at": string,"external_id": string | null,"id": string,"is_active": boolean,"name": string,"price": number,"store_id": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "archived_at"?: string | null,"created_at"?: string,"external_id"?: string | null,"id"?: string,"is_active"?: boolean,"name": string,"price"?: number,"store_id": string,"updated_at"?: string
                   }
@@ -121,6 +125,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"display_name": string,"id": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"display_name": string,"id": string
                   }
@@ -134,6 +139,7 @@ isOneToOne: false
                   Row: {
                     "id": string,"item_id": string,"item_unit_id": string | null,"purchase_order_id": string,"quantity": number,"received_quantity": number,"unit_price": number | null
                   }
+                  ComputedFields: never
                   Insert: {
                     "id"?: string,"item_id": string,"item_unit_id"?: string | null,"purchase_order_id": string,"quantity": number,"received_quantity"?: number,"unit_price"?: number | null
                   }
@@ -171,6 +177,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"created_by": string | null,"expected_on": string | null,"id": string,"memo": string | null,"ordered_at": string | null,"status": Database["public"]['Enums']["purchase_order_status"],"store_id": string,"supplier_id": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"created_by"?: string | null,"expected_on"?: string | null,"id"?: string,"memo"?: string | null,"ordered_at"?: string | null,"status"?: Database["public"]['Enums']["purchase_order_status"],"store_id": string,"supplier_id": string,"updated_at"?: string
                   }
@@ -202,6 +209,7 @@ isOneToOne: false
                   Row: {
                     "item_id": string,"menu_id": string,"quantity": number
                   }
+                  ComputedFields: never
                   Insert: {
                     "item_id": string,"menu_id": string,"quantity": number
                   }
@@ -233,6 +241,7 @@ isOneToOne: false
                   Row: {
                     "amount": number | null,"created_at": string,"created_by": string | null,"external_id": string | null,"id": string,"menu_id": string,"quantity": number,"sold_at": string,"source": Database["public"]['Enums']["sale_source"],"store_id": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "amount"?: number | null,"created_at"?: string,"created_by"?: string | null,"external_id"?: string | null,"id"?: string,"menu_id": string,"quantity": number,"sold_at"?: string,"source"?: Database["public"]['Enums']["sale_source"],"store_id": string
                   }
@@ -264,6 +273,7 @@ isOneToOne: false
                   Row: {
                     "adjustment": number | null,"counted_at": string | null,"counted_by": string | null,"counted_quantity": number | null,"expected_quantity": number,"item_id": string,"stock_count_id": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "adjustment"?: number | null,"counted_at"?: string | null,"counted_by"?: string | null,"counted_quantity"?: number | null,"expected_quantity": number,"item_id": string,"stock_count_id": string
                   }
@@ -301,6 +311,7 @@ isOneToOne: false
                   Row: {
                     "category_id": string | null,"completed_at": string | null,"completed_by": string | null,"created_at": string,"created_by": string | null,"id": string,"memo": string | null,"started_at": string,"status": Database["public"]['Enums']["stock_count_status"],"store_id": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "category_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"memo"?: string | null,"started_at"?: string,"status"?: Database["public"]['Enums']["stock_count_status"],"store_id": string
                   }
@@ -338,6 +349,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"expires_on": string | null,"id": string,"item_id": string,"received_at": string,"store_id": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"expires_on"?: string | null,"id"?: string,"item_id": string,"received_at"?: string,"store_id": string
                   }
@@ -369,6 +381,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"created_by": string | null,"entered_quantity": number | null,"entered_unit_id": string | null,"id": string,"item_id": string,"lot_id": string | null,"memo": string | null,"occurred_at": string,"purchase_order_line_id": string | null,"quantity": number,"sale_record_id": string | null,"stock_count_id": string | null,"store_id": string,"type": Database["public"]['Enums']["movement_type"],"unit_cost": number | null
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"created_by"?: string | null,"entered_quantity"?: number | null,"entered_unit_id"?: string | null,"id"?: string,"item_id": string,"lot_id"?: string | null,"memo"?: string | null,"occurred_at"?: string,"purchase_order_line_id"?: string | null,"quantity": number,"sale_record_id"?: string | null,"stock_count_id"?: string | null,"store_id": string,"type": Database["public"]['Enums']["movement_type"],"unit_cost"?: number | null
                   }
@@ -442,6 +455,7 @@ isOneToOne: false
                   Row: {
                     "accepted_at": string | null,"accepted_by": string | null,"created_at": string,"created_by": string | null,"email": string | null,"expires_at": string,"id": string,"role": Database["public"]['Enums']["member_role"],"store_id": string,"token": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "accepted_at"?: string | null,"accepted_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"email"?: string | null,"expires_at"?: string,"id"?: string,"role": Database["public"]['Enums']["member_role"],"store_id": string,"token"?: string
                   }
@@ -473,6 +487,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"role": Database["public"]['Enums']["member_role"],"store_id": string,"user_id": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"role": Database["public"]['Enums']["member_role"],"store_id": string,"user_id": string
                   }
@@ -498,6 +513,7 @@ isOneToOne: false
                   Row: {
                     "created_at": string,"id": string,"name": string,"timezone": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "created_at"?: string,"id"?: string,"name": string,"timezone"?: string
                   }
@@ -511,6 +527,7 @@ isOneToOne: false
                   Row: {
                     "archived_at": string | null,"contact_name": string | null,"created_at": string,"email": string | null,"id": string,"memo": string | null,"name": string,"phone": string | null,"store_id": string,"updated_at": string
                   }
+                  ComputedFields: never
                   Insert: {
                     "archived_at"?: string | null,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"id"?: string,"memo"?: string | null,"name": string,"phone"?: string | null,"store_id": string,"updated_at"?: string
                   }
@@ -533,6 +550,7 @@ isOneToOne: false
                   Row: {
                     "item_id": string | null,"received_at": string | null,"store_id": string | null,"unit_cost": number | null
                   }
+                  ComputedFields: never
                   Relationships: [
                     {
       foreignKeyName: "stock_movements_item_id_items_id_fk"
@@ -558,6 +576,7 @@ isOneToOne: false
                   Row: {
                     "is_low": boolean | null,"item_id": string | null,"quantity": number | null,"store_id": string | null
                   }
+                  ComputedFields: never
                   Relationships: [
                     {
       foreignKeyName: "items_store_id_stores_id_fk"
@@ -571,6 +590,7 @@ isOneToOne: false
                   Row: {
                     "expires_on": string | null,"item_id": string | null,"lot_id": string | null,"quantity": number | null,"store_id": string | null
                   }
+                  ComputedFields: never
                   Relationships: [
                     {
       foreignKeyName: "stock_lots_item_id_items_id_fk"
@@ -596,6 +616,7 @@ isOneToOne: false
                   Row: {
                     "book_quantity": number | null,"item_id": string | null,"stock_count_id": string | null
                   }
+                  ComputedFields: never
                   Relationships: [
                     {
       foreignKeyName: "stock_count_lines_item_id_items_id_fk"
@@ -622,6 +643,9 @@ isOneToOne: false
           Functions: {
             "accept_invitation":
 { Args: { "p_token": string }; Returns: string
+                           },
+"apply_store_template":
+{ Args: { "p_store_id": string,"p_template": Json }; Returns: Json
                            },
 "change_purchase_order_status":
 { Args: { "p_order_id": string,"p_status": Database["public"]['Enums']["purchase_order_status"] }; Returns: Database["public"]['Enums']["purchase_order_status"]

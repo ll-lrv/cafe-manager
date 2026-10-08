@@ -12,6 +12,7 @@ import {
   derivePurchaseOrderStatus,
   formatQuantity,
   formatUnitCount,
+  CAFE_TEMPLATE,
   oneUnitLabel,
   fromBaseQuantity,
   mergeDeltas,
@@ -241,5 +242,27 @@ describe("recipe cost", () => {
   it("원가율을 소수 첫째 자리까지 계산한다", () => {
     expect(costRate(5000, 1030)).toBe(20.6);
     expect(costRate(0, 100)).toBeNull();
+  });
+});
+
+describe("templates", () => {
+  const t = CAFE_TEMPLATE;
+  it("카페 기본 템플릿의 참조가 모두 맞다", () => {
+    const itemNames = new Set(t.items.map((i) => i.name));
+    expect(itemNames.size).toBe(t.items.length);
+    expect(new Set(t.menus.map((m) => m.name)).size).toBe(t.menus.length);
+    for (const item of t.items) {
+      expect(t.categories).toContain(item.category);
+      expect(item.units.length).toBeGreaterThan(0);
+      for (const u of item.units) expect(u.factor).toBeGreaterThan(0);
+    }
+    for (const menu of t.menus) {
+      expect(Number.isInteger(menu.price)).toBe(true);
+      expect(new Set(menu.recipe.map((r) => r.item)).size).toBe(menu.recipe.length);
+      for (const r of menu.recipe) {
+        expect(itemNames).toContain(r.item);
+        expect(r.quantity).toBeGreaterThan(0);
+      }
+    }
   });
 });

@@ -23,8 +23,8 @@ export type App = {
   email(role: string): string;
   /** 새 브라우저(다른 사람·다른 기기). 페이지 오류와 콘솔 오류를 모아 테스트 끝에 확인한다. */
   newPage(options?: NewPageOptions): Promise<{ ctx: BrowserContext; page: Page }>;
-  /** 가입하고 매장을 만들어 대시보드까지 간 사장 */
-  owner(options: { storeName: string; name?: string }): Promise<User>;
+  /** 가입하고 매장을 만들어 대시보드까지 간 사장. 기본 템플릿은 template: true 일 때만 넣는다. */
+  owner(options: { storeName: string; name?: string; template?: boolean }): Promise<User>;
   /** 사장 화면에서 초대 링크를 만들고, 새 사람이 가입해 수락한다. 대시보드에서 끝난다. */
   joinByInvite(ownerPage: Page, options?: { name?: string; viewport?: NewPageOptions["viewport"] }): Promise<User>;
 };
@@ -78,13 +78,17 @@ export const test = base.extend<{ app: App }>({
       return { ctx, page };
     };
 
-    const owner: App["owner"] = async ({ storeName, name = "김사장" }) => {
+    let ownerCount = 0;
+    const owner: App["owner"] = async ({ storeName, name = "김사장", template = false }) => {
       const { ctx, page } = await newPage();
-      const ownerEmail = email("owner");
+      // 한 테스트에서 사장을 여럿 만들 수 있도록 두 번째부터는 이메일을 다르게
+      ownerCount += 1;
+      const ownerEmail = email(ownerCount === 1 ? "owner" : `owner${ownerCount}`);
       await page.goto("/login");
       await signup(page, name, ownerEmail);
       await page.waitForURL("**/onboarding");
       await page.fill("#store-name", storeName);
+      await page.setChecked("#store-template", template);
       await page.getByRole("button", { name: "매장 만들기" }).click();
       await page.waitForURL("**/dashboard");
       return { ctx, page, email: ownerEmail, name };

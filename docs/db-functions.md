@@ -193,6 +193,28 @@ NestJS에서는 `SalesService.cancel()` 에서 같은 트랜잭션으로 지우�
 | 권한 | 로그인 사용자 |
 | 쓰는 테이블 | `stores`, `store_members`(만든 사람을 owner 로) |
 
+### `apply_store_template` — 기본 템플릿 불러오기
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261008031736_apply_store_template.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/templates.ts` `applyCafeTemplate()` (매장 만들기 체크, 대시보드 "기본 템플릿 불러오기") |
+| NestJS 대응 | `CatalogService.applyTemplate()` (예정) |
+| 권한 | 사장·매니저 (`catalog:manage`) |
+| 잠금 | `stores` 행 `FOR UPDATE` → 같은 매장에 동시에 두 번 불러와도 겹치지 않는다 |
+| 쓰는 테이블 | `categories`, `items`, `item_units`, `menus`, `recipe_ingredients` |
+| core 대응 | `CAFE_TEMPLATE` (`StoreTemplate` 형태, 템플릿 내용은 여기만 고친다) |
+
+입력: `p_store_id`, `p_template`(jsonb: `categories` 이름 배열, `items`, `menus`)
+반환: 새로 만든 개수 `{"categories", "items", "menus"}`
+
+처리 순서
+1. 로그인 → 사장·매니저인지 → `categories`/`items`/`menus` 가 배열인지 (아니면 "템플릿 형식이 올바르지 않습니다.")
+2. 카테고리: 기존 카테고리 뒤 순서로. **같은 이름이 있으면 건너뛴다** (품목·메뉴도 같음, 있는 것은 바꾸지 않는다)
+3. 품목: 카테고리는 이름으로 연결, 입고 단위는 첫 번째가 기본 입고 단위
+4. 메뉴: **새로 만든 메뉴에만** 레시피를 넣는다. 재료는 같은 이름의 품목(원래 있던 것 포함)을 쓰고, 보관한 품목은 뺀다
+5. 그래서 품목을 일부 등록한 매장에서 불러와도, 두 번 불러와도 안전하다 (두 번째는 모두 0)
+
 ### `accept_invitation` — 직원 초대 수락
 
 | | |
