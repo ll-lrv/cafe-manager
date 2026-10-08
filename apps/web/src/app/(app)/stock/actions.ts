@@ -3,8 +3,10 @@
 import { can } from "@cafe/core";
 import { revalidatePath } from "next/cache";
 import { ApiError, toActionError, type ActionState } from "@/lib/api/errors";
+import { getLatestCosts } from "@/lib/api/menus";
 import { recordMovement, type ManualMovementType } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
+import { costNoticeAfterReceive } from "@/lib/cost-notice";
 
 const TYPES: ManualMovementType[] = ["receive", "consume", "waste", "adjust"];
 
@@ -44,20 +46,26 @@ export async function recordMovementAction(_prev: ActionState, formData: FormDat
     const memo = text(formData, "memo") || null;
     if (type === "adjust" && !memo) throw new ApiError("조정 사유를 입력해 주세요.");
 
+    const unitPrice = type === "receive" ? numberOrNull(formData, "unitPrice") : null;
+    // 단가를 넣은 입고면 단가 변동 알림을 위해 입고 전 단가를 받아 둔다. (원가는 리포트 권한이 있는 사람에게만)
+    const watchCost = unitPrice !== null && can(store.role, "report:view");
+    const costsBefore = watchCost ? await getLatestCosts(store.storeId, { itemIds: [itemId] }) : {};
+
     await recordMovement({
       itemId,
       type,
       // 조정은 늘림/줄임을 따로 고르고 수량은 양수로 받는다.
       quantity: type === "adjust" && text(formData, "direction") === "decrease" ? -quantity : quantity,
       unitId: text(formData, "unitId") || null,
-      unitPrice: type === "receive" ? numberOrNull(formData, "unitPrice") : null,
+      unitPrice,
       expiresOn: type === "receive" || type === "adjust" ? text(formData, "expiresOn") || null : null,
       memo,
     });
 
     revalidatePath("/stock");
     revalidatePath("/items", "layout");
-    return { ok: true, message: DONE_MESSAGE[type] };
+    const notice = watchCost ? await costNoticeAfterReceive(store.storeId, [itemId], costsBefore) : undefined;
+    return { ok: true, message: DONE_MESSAGE[type], notice };
   } catch (e) {
     return toActionError(e);
   }

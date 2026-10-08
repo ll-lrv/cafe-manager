@@ -546,7 +546,33 @@ isOneToOne: false
                 }
           }
           Views: {
-            "item_latest_costs": {
+            "item_cost_changes": {
+                  Row: {
+                    "changed_at": string | null,"item_id": string | null,"previous_unit_cost": number | null,"store_id": string | null,"unit_cost": number | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "stock_movements_item_id_items_id_fk"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "item_stock_levels"
+      referencedColumns: ["item_id"]
+    },{
+      foreignKeyName: "stock_movements_item_id_items_id_fk"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_movements_store_id_stores_id_fk"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"item_latest_costs": {
                   Row: {
                     "item_id": string | null,"received_at": string | null,"store_id": string | null,"unit_cost": number | null
                   }

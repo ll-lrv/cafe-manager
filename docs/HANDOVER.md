@@ -1,6 +1,6 @@
 # 인수인계 문서 — cafe-manager
 
-작성일: 2026-10-06 · 최종 갱신: 2026-10-07 · 기준 커밋: `b4dcb74` (main)
+작성일: 2026-10-06 · 최종 갱신: 2026-10-08 · 기준 커밋: `89794a1` (main)
 
 이 문서 하나로 프로젝트를 이어받을 수 있게 정리했다. 세부 기록은 아래 문서에 있다.
 
@@ -15,17 +15,17 @@
 
 ## 1. 한눈에 보기
 
-카페 운영 관리 앱. **재고관리 MVP와 MVP 다듬기는 끝났고, 배포만 남았다.**
+카페 운영 관리 앱. **재고관리 MVP는 끝났고, 유료화를 위한 기능(카페 기본 템플릿, 이론 vs 실제 리포트)을 붙이는 중이다.** 배포는 아직 안 했다.
 
 | 항목 | 상태 |
 |---|---|
-| 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) |
+| 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림** |
 | 저장소 | https://github.com/ll-lrv/cafe-manager (**공개**) |
-| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 최근 실행 모두 통과 |
-| 테스트 | core 단위 23개, 브라우저 E2E 8개 시나리오 (로컬·CI 모두 통과) |
+| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 최근 실행(`89794a1`) 모두 통과 |
+| 테스트 | core 단위 31개, 브라우저 E2E 11개 시나리오 (로컬 통과) |
 | 배포 | **아직 없음.** 로컬 Supabase(Docker)에서만 동작. 후보: Supabase 클라우드(서울) + Vercel (§10) |
-| 로컬 DB | 2026-10-07 `db:reset` 으로 비움 → **계정·매장 없음.** 쓰려면 새로 가입한다 |
-| 다음 | 배포 → 매출(CSV/POS) 연동 → 분석 → NestJS 전환 → Expo 앱 (§10) |
+| 로컬 DB | 2026-10-07 에 비운 뒤 **데모 계정 하나**를 만들어 둠: `demo-owner@cafe.kr` / `test1234` ("데모 카페", 품목 3·메뉴 2·판매 65잔). 실사 기록은 없다 |
+| 다음 | CSV 판매 업로드 → 메뉴 수익성 순위 → 배포·시범 매장 (§10) |
 
 ---
 
@@ -63,7 +63,7 @@ npx supabase start -x imgproxy,edge-runtime,logflare,vector,supavisor
 npx supabase status        # Publishable key 를 .env.local 의 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 에
 pnpm dev                   # http://localhost:3000
 ```
-- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 15개가 모두 적용된다.
+- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 17개가 모두 적용된다.
 - DB 보기: Supabase Studio http://127.0.0.1:55323 · 메일함(Mailpit) http://127.0.0.1:55324
 
 ### 이어서 작업할 때
@@ -91,6 +91,7 @@ pnpm dev                   # http://localhost:3000
 - `main` 에 push 하면 CI 가 돈다. 결과: 저장소 Actions 탭 또는 `gh run list -R ll-lrv/cafe-manager`
 - 이 저장소의 `user.email` 은 `88585381+ll-lrv@users.noreply.github.com` 로 설정돼 있다 (로컬 git 설정). 다른 PC에서 받으면 같은 주소로 설정한다
 - 예전 저장소는 `ll-lrv/cafe-manager_v1` (이름이 `cafe-manager` 에서 바뀐 것). `C:\project\cafe-manager_v1` 폴더의 origin 은 `.../cafe-manager_v1.git` 로 바꿔 두었다
+- 작업 방식(2026-10-08~): 기능마다 브랜치(`fix/...`, `feat/...`)에서 커밋 → `main` 에 fast-forward merge → push → 브랜치 삭제 → CI 결과 확인. 커밋·push 는 사용자가 요청할 때만 한다
 - `.github/workflows/` 를 바꿔 push 하려면 GitHub 토큰에 `workflow` 권한이 필요하다 (`gh auth refresh -h github.com -s workflow`, 이 PC는 설정됨)
 
 ---
@@ -101,15 +102,15 @@ pnpm dev                   # http://localhost:3000
 apps/web                Next.js 16 (App Router)
   src/app/(app)/...     로그인 후 화면 (공통 레이아웃: 메뉴·실시간 새로고침)
   src/app/login, onboarding, invite/[token]
-  src/lib/api/*         데이터 접근 (server-only). NestJS 전환 시 여기만 바꾼다
+  src/lib/api/*         데이터 접근 (server-only). NestJS 전환 시 여기만 바꾼다 (templates.ts 기본 템플릿, reports.ts 리포트 집계 포함)
   src/lib/api/realtime.ts  브라우저용 실시간 구독 (예외적으로 클라이언트에서 사용)
   src/lib/inventory.ts, order-suggestions.ts  화면용 계산 (매장 시간대의 오늘·하루 범위, 재고 상태, 발주 추천)
   src/components/form-parts.tsx  폼 공용 부품 (§8)
   src/proxy.ts          (Next 16 의 middleware) 로그인 여부만 확인
 packages/core           순수 TS 비즈니스 로직 + 단위 테스트 (DB·프레임워크 의존 금지)
 packages/db             Drizzle 스키마 (스키마 변경은 반드시 여기서)
-supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (15개)
-e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 8개
+supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (17개)
+e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 10개
 .github/workflows/ci.yml  CI (타입·lint·단위 테스트, Supabase + E2E)
 docs/                   이 문서, PROGRESS, db-functions
 ```
@@ -126,7 +127,7 @@ docs/                   이 문서, PROGRESS, db-functions
 ```
 
 ### packages/core 주요 함수
-단위 환산(`toBaseQuantity`, `formatQuantity`), 레시피 차감(`saleDeductions`), 원가(`recipeCost`, `costRate`), FIFO(`allocateFifo`), 실사 조정(`countAdjustments`), 발주(`derivePurchaseOrderStatus`, `suggestOrderQuantity`, `orderTotal`), 재고·유통기한 상태(`stockStatus`, `expiryStatus`), 시간대(`dateInTimeZone`, `zonedTimeToUtc`, `isValidTimeZone`), 권한(`can`). 테스트 23개.
+단위 환산(`toBaseQuantity`, `formatQuantity`, `formatUnitCount`, `oneUnitLabel`), 레시피 차감(`saleDeductions`), 원가(`recipeCost`, `costRate`), FIFO(`allocateFifo`), 실사 조정(`countAdjustments`), 발주(`derivePurchaseOrderStatus`, `suggestOrderQuantity`, `orderTotal`), 재고·유통기한 상태(`stockStatus`, `expiryStatus`), 시간대(`dateInTimeZone`, `zonedTimeToUtc`, `isValidTimeZone`), 권한(`can`), 기본 템플릿 데이터(`CAFE_TEMPLATE`), 이론 vs 실제(`avtLine`, `avtSummary`, `sortAvtLines`), 단가 변동(`costChangePercent`, `isNotableCostChange`, `menuCostImpacts`, 기준 `COST_ALERT_PERCENT`·`COST_ALERT_DAYS`). 테스트 31개.
 DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기면 core 함수를 쓰고 SQL은 지운다.
 
 ---
@@ -135,15 +136,16 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 | 경로 | 기능 | 사용 |
 |---|---|---|
-| `/login`, `/onboarding`, `/invite/[token]` | 로그인·가입, 매장 만들기, 초대 수락 | 누구나 |
-| `/dashboard` | 오늘 매출, 부족 품목, 유통기한 확인, 진행 중 실사, 입고 예정, 최근 기록 | 구성원 (입고 예정은 사장·매니저) |
+| `/login`, `/onboarding`, `/invite/[token]` | 로그인·가입, 매장 만들기(카페 기본 템플릿 체크, 기본 켜짐), 초대 수락 | 누구나 |
+| `/dashboard` | 오늘 매출, 부족 품목, 유통기한 확인, 진행 중 실사, 입고 단가 변동, 입고 예정, 최근 기록. 품목이 없으면 "기본 템플릿 불러오기" | 구성원 (단가 변동·입고 예정·템플릿은 사장·매니저) |
 | `/sales` | 메뉴별 판매 일괄 입력(± 버튼), 차감될 재료 미리보기, 날짜 이동(지난 날은 23:59로 기록), 매출 합계, 판매 취소 | 입력: 구성원 / 취소: 사장·매니저 |
 | `/stock` | 입고·사용·폐기·조정, 재고 미리보기, 단가·유통기한, 최근 기록 | 구성원 / 조정: 사장·매니저 |
-| `/items`, `/items/[id]`, `/items/new`, `/items/categories` | 품목·재고 목록(상태 필터), 상세(로트별 남은 양, 기록), 입고 단위, 기본 거래처, 카테고리 | 보기: 구성원 / 관리: 사장·매니저 |
+| `/items`, `/items/[id]`, `/items/new`, `/items/categories` | 품목·재고 목록(상태 필터), 상세(로트별 남은 양, 기록, 입고 단가와 최근 변동), 입고 단위, 기본 거래처, 카테고리 | 보기: 구성원 (입고 단가는 사장·매니저) / 관리: 사장·매니저 |
 | `/menus`, `/menus/[id]`, `/menus/new` | 메뉴 가격, 레시피, 원가·원가율 | 보기: 구성원 / 관리: 사장·매니저 |
 | `/counts`, `/counts/[id]` | 재고 실사 (전체/카테고리, 묶음+낱개 입력, 여럿이 나눠 세기, 완료·취소, 결과) | 세기: 구성원 / 완료·취소: 사장·매니저 |
 | `/orders`, `/orders/[id]`, `/orders/new` | 발주서 (부족 품목 추천, 발주 내용 복사, 일부 입고, 마감) | 사장·매니저 |
 | `/suppliers`, `/suppliers/[id]`, `/suppliers/new` | 거래처 | 사장·매니저 |
+| `/reports` | 이론 vs 실제 사용량(AvT): 매출·이론/실제 원가와 원가율·차이 금액, 품목별 차이(원인별), 기간(실사 구간·7일·30일·이번 달·직접) | 사장·매니저 |
 | `/settings/members` | 직원 초대(링크), 역할 변경, 내보내기 | 사장 |
 | `/settings/store` | 매장 이름, 시간대 | 사장 |
 
@@ -156,6 +158,10 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - **매장 시간대**: "오늘"·하루의 경계·화면의 날짜와 시각은 `stores.timezone`(기본 Asia/Seoul)을 따른다. 지난 날짜 판매는 그 시간대의 23:59 로 기록. 시간대를 바꿔도 이미 기록된 시각은 그대로이고 보여주는 기준만 바뀐다. 페이지에서는 `requireCurrentStore()` 의 `timeZone` 을 쓴다.
 - **실시간 반영**: 다른 기기의 입출고·품목 변경·판매·판매 취소·실사 입력이 새로고침 없이 반영된다. 입력 중인 폼 값은 유지된다.
 - **삭제 대신 보관**: 품목·메뉴·거래처는 보관(archived_at)만 한다.
+- **수량 표시**: 단위 이름이 숫자로 시작하면("1L 팩") 수량과 나눠 "2 × 1L 팩"으로 보여준다. 숫자와 단위 이름을 붙여 쓸 땐 `formatQuantity`·`formatUnitCount`·`oneUnitLabel` 을 쓴다 (수량과 단위 이름을 문자열로 직접 붙이지 않는다).
+- **기본 템플릿**: 내용은 `packages/core/src/templates.ts` 한 곳. 같은 이름이 있으면 건너뛰므로 두 번 불러도 안전. 새로 만든 메뉴에만 레시피를 넣는다. 매장 만들 때 템플릿 적용이 실패해도 매장은 만들어지고(서버 로그만 남김) 대시보드에서 다시 불러올 수 있다.
+- **이론 vs 실제(AvT)**: 이론 = 판매로 차감된 양. 실제 = 이론 + 레시피 밖 사용(consume) + 폐기 + 실사에서 모자란 양 + 직접 조정. 금액은 최근 입고 단가 기준. 실사 구간은 (앞 실사 완료, 이번 실사 완료] 로 자른다(실사 조정 원장이 완료 시각에 기록되므로). 그 기간에 세지 않은 품목은 "실사 안 함" — 차이 0 이 "맞았다"는 뜻이 아니다.
+- **입고 단가 변동 알림**: 품목의 "가장 최근 단가 변동" = 직전 입고와 단가가 달라진 마지막 입고(`item_cost_changes` 뷰). 직전보다 5% 이상(`COST_ALERT_PERCENT`) 바뀌면 ① 입고 직후 알림(입출고·발주 입고, 알림 아래 안내로 12초) ② 대시보드 카드(최근 14일, `COST_ALERT_DAYS`) ③ 품목 상세(기준 미만도 표시)에 그 품목을 쓰는 메뉴의 원가율 변화를 보여준다. 다른 재료는 지금 단가로 계산한다. 원가 정보라 `report:view`(사장·매니저)에게만 보인다. 입고 직후 알림은 입고 전·후 `item_latest_costs` 를 비교한다 (`lib/cost-notice.ts`).
 
 ---
 
@@ -174,7 +180,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `catalog:manage` 품목·카테고리·메뉴·레시피 | ✓ | ✓ | |
 | `supplier:manage` 거래처 | ✓ | ✓ | |
 | `purchase:manage` 발주·입고 처리 | ✓ | ✓ | |
-| `report:view` 리포트 (아직 화면 없음) | ✓ | ✓ | |
+| `report:view` 리포트 (`/reports`) | ✓ | ✓ | |
 | `member:manage` 직원 관리 | ✓ | | |
 | `store:manage` 매장 정보 (이름·시간대) | ✓ | | |
 
@@ -184,7 +190,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 ## 7. DB
 
-### 마이그레이션 (적용 순서, 15개 — 2026-10-07 빈 DB에 처음부터 적용 확인, CI 도 매번 처음부터 적용)
+### 마이그레이션 (적용 순서, 18개 — CI 가 매번 빈 DB에 처음부터 적용)
 | 파일 | 내용 |
 |---|---|
 | `20261003015300_init` | 전체 스키마 (Drizzle) |
@@ -198,6 +204,9 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `20261006044355/57_purchas*` | 발주 줄 중복 금지, 발주 함수·컬럼 권한 |
 | `20261007100209_store_settings` | 매장 이름·시간대만 수정(컬럼 권한), 값 검사 트리거 `validate_store` |
 | `20261007100554_sale_cancel_broadcast` | 판매 취소를 비공개 Realtime 채널 `store:<id>` 로 방송, 구성원만 수신 (`realtime.messages` 정책) |
+| `20261008031736_apply_store_template` | 기본 템플릿 불러오기 함수 |
+| `20261008033540_stock_usage_summary` | 기간별 품목 원장 합계 (읽기 전용, 리포트용) |
+| `20261008051034_item_cost_changes` | 품목별 가장 최근 입고 단가 변동 뷰 (단가 알림용) |
 
 ### DB 함수·트리거 (상세는 `docs/db-functions.md`)
 | 이름 | 하는 일 |
@@ -208,6 +217,8 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `receive_purchase_order` / `change_purchase_order_status` | 발주 입고 / 허용된 상태 전환 |
 | `stock_outflow` (내부 전용) | 유통기한 순 차감 공용 로직 |
 | `create_store`, `accept_invitation`, `get_invitation` | 매장 만들기, 초대 |
+| `apply_store_template` | 카테고리·품목·입고 단위·메뉴·레시피를 한 트랜잭션으로 (같은 이름은 건너뜀, 사장·매니저) |
+| `stock_usage_summary` (읽기 전용, SECURITY INVOKER) | 기간별 품목 원장 합계 + 그 기간에 센 품목인지. 집계만 하고 계산은 core `avt.ts` |
 | 트리거 `validate_store` | 매장 이름(공백 제거, 1~50자)·시간대(`pg_timezone_names`) 검사 |
 | 트리거 `broadcast_sale_cancelled` | 판매가 지워지면 `realtime.send` 로 매장 채널에 `sale_cancelled` 방송 |
 
@@ -238,7 +249,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `useFormAction(action, { resetOnSuccess, toastResult })` | 입력칸이 있는 모든 폼. `<form action>` 은 React 19가 제출 후 결과와 상관없이 입력칸을 비우므로, 오류가 나도 입력값이 남게 직접 제출한다. 결과에 추가 필드가 있으면 그 타입이 그대로 `state` 가 된다 (예: 직원 초대의 `token`) |
 | `toastResult: true` | 성공하면 폼이 화면에서 사라지는 곳 (예: 발주 입고 완료) |
 | `ActionButton` | 누르면 그 줄이 사라지는 삭제·취소 버튼. `useActionState` 로 하면 줄과 함께 결과가 사라져 알림이 안 뜬다 |
-| `useToastResult(state)` | 결과를 알림으로 |
+| `useToastResult(state)` | 결과를 알림으로. 액션 결과에 `notice` 가 있으면 알림 아래 안내로 더 오래(12초) 보여준다 (예: 입고 단가 변동) |
 | `SubmitButton`, `Field`, `NativeSelect`, `FormMessage` | 기본 부품 (모바일 안정성 때문에 select 는 네이티브) |
 
 입력칸이 없거나 select 하나뿐인 폼(초대 수락, 역할 변경)만 `useActionState` 를 그대로 쓴다.
@@ -252,6 +263,8 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 ### 브라우저 E2E (`e2e/README.md` 에 자세히)
 - `import { test, expect } from "../fixtures"` 로 시작하고 `app.owner()` 로 매장을 만든다. 계정은 `app.email()` 로만 만든다 (그래야 테스트 끝에 지워진다).
+- `app.owner()` 는 기본으로 **템플릿 없이** 매장을 만든다 (기존 테스트가 "원두" 같은 품목을 직접 만들어 이름이 겹치므로). 템플릿이 필요하면 `template: true`. 한 테스트에서 사장을 여럿 만들 수 있다 (두 번째부터 이메일이 다름).
+- 메뉴 유무는 화면 글자가 아니라 링크 role 로 확인한다 (매장 이름 "리포트테스트"에 "리포트"가 들어 있어 헤더 글자 검사가 틀렸던 적이 있다).
 - 알림(토스트)은 화면 갱신보다 조금 먼저 뜬다. 알림 직후 화면을 읽지 말고 `expect(locator).toContainText()` 처럼 바뀐 내용을 기다린다. 같은 문구의 알림이 연달아 뜨는 곳(발주 → 되돌리기 → 다시 발주)은 알림 대신 화면 상태로 확인한다.
 - 다른 기기 반영은 화면을 연 뒤 `waitForRealtime()` 으로 구독 연결을 기다리고 `appearsLive()` / `disappearsLive()` 로 확인한다.
 - 새 기능의 실시간·권한 확인은 "기능을 끄면 테스트가 실패하는지"까지 확인해 두면 좋다 (판매 취소 방송은 트리거를 끄고 실패를 확인했다).
@@ -261,6 +274,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - 스크립트로 파일을 고칠 때 CRLF 가 섞이지 않게 주의 (저장소는 LF).
 - 의존성을 바꿔 `pnpm install` 한 뒤에는 **개발 서버를 다시 띄운다.** 설치 경로가 바뀌면(예: `@playwright/test` 는 Next 의 선택 peer) 떠 있던 서버가 옛 경로와 섞여 404 화면에서 모듈 오류를 낸다. 필요하면 `apps/web/.next` 도 지운다.
 - 백그라운드로 띄운 `pnpm dev` 를 멈춰도 Next 프로세스가 남아 3000 포트를 잡고 있을 수 있다. 포트를 쓰는 프로세스를 확인하고 끈다.
+- 오래 떠 있던 개발 서버가 새 파일을 추가한 뒤 모든 페이지에서 500 + "Jest worker encountered 2 child process exceptions" 를 낸 적이 있다 (2026-10-08). 코드 문제가 아니라 서버를 다시 띄우면 된다. E2E 는 떠 있는 서버를 그대로 쓰므로 이런 실패가 나면 먼저 서버를 다시 띄운다.
 
 ---
 
@@ -268,10 +282,10 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 | 종류 | 상태 |
 |---|---|
-| core 단위 테스트 (vitest) | 23개, `pnpm test` |
+| core 단위 테스트 (vitest) | 31개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`(web·core·db·e2e), `pnpm lint`(web: Next 규칙, core·db: `typescript-eslint` 권장) 통과 |
 | DB 함수·정책 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
-| 브라우저 E2E | `e2e/tests/` 8개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, 실사, 발주, 매장 설정. 로컬 약 3분(3개 병렬), CI 약 5분 |
+| 브라우저 E2E | `e2e/tests/` 11개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동. 로컬 약 3~6분(3개 병렬), CI 약 5분 |
 | CI | GitHub Actions 두 잡(`타입·lint·단위 테스트`, `브라우저 E2E`). 실패하면 실행 화면 Artifacts 의 `playwright-report` 를 받아 본다 |
 
 E2E 는 `@playwright/test` 다. 시나리오 하나가 테스트 하나이고 단계(`test.step`)로 나뉘며, 확인 항목은 `expect.soft` 라 하나가 실패해도 끝까지 돈다. 실패하면 한 번 재시도한다(재시도에서 통과하면 `flaky`).
@@ -282,30 +296,53 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 
 ## 10. 앞으로 해야 할 일 (권장 순서)
 
-### 1) 배포 — 다음 작업
-후보: **Supabase 클라우드(서울 리전) + Vercel**. 사용자가 방향을 정하면 진행한다. Supabase·Vercel 계정 로그인은 사용자가 직접 해야 한다.
+### 제품 방향 (2026-10-08 사용자와 논의)
+- **수익화 판단**: 가능하지만 "재고 기록 앱"으로는 돈을 받기 어렵다. 돈이 되는 가치는 **원가율·로스(이론 vs 실제)를 보여주는 것**. 걸림돌은 ① 판매 수동 입력(매일 안 하면 숫자가 틀어짐 → POS·CSV 연동이 유료화의 전제), ② 처음 세팅 부담(→ 기본 템플릿으로 일부 해결).
+- **경쟁사** (공식 가격 페이지, 2026-10-08 확인): MarketMan Starter $249·Growth $299/월, WISK 단일 매장 $249/월(음료 또는 음식) + 도입비 $750. 둘 다 POS 60여 개 연동, AvT·단가 알림·추천 발주·청구서 OCR·매장 간 이동이 핵심. 국내 개인 카페에는 1/10 수준 가격이 현실적 → **셀프 세팅 + 국내 연동(POS·카카오)** 으로 차별화.
+- **타깃 후보**: 개인 카페(무료·저가) + 2~10개 매장 소규모 체인(매장 비교·통합 발주로 높은 요금).
+- **검증 제안**: 기능을 더 만들기 전에 아는 카페 2~3곳에서 2주 시범 사용 (판매 입력을 매일 하는지, 원가율을 보고 가격을 바꾸는지 확인). 시범 사용에는 배포(5)가 필요하다.
+- 사용자와 합의한 순서: ① AvT 리포트(완료) → ② 입고 단가 변동 알림(완료) → ③ CSV 판매 업로드 → ④ 메뉴 수익성 순위.
+
+### 1) 입고 단가 변동 알림 — 완료 (2026-10-08)
+- [x] 입고 직후 알림, 대시보드 카드, 품목 상세. 동작은 §5 "꼭 알아야 할 동작"
+- [ ] 남은 것(필요하면): 품목별 단가 추이 그래프, 알림 기준을 매장 설정으로, 알림 발송(§10-6)
+
+### 2) CSV 판매 업로드 (매출 연동 1단계) — 다음 작업
+- [ ] 파일 → 메뉴 매칭(`menus.external_id`) → `record_sales` 를 `source = 'csv'`, `external_id` 로 호출 (`sale_records_external_key` 로 중복 방지). 함수에 source·external_id 인자 추가 필요
+- [ ] 국내 POS(토스플레이스 등) 내보내기 형식을 확인하고 매칭 화면. 이후 POS 직접 연동(웹훅 또는 주기 동기화)
+
+### 3) 메뉴 수익성 순위
+- [ ] 메뉴별 판매량 × 개당 마진으로 "많이 벌어주는 메뉴 / 많이 팔리지만 남는 게 적은 메뉴". `/reports` 에 탭으로 추가 (`report:view`)
+
+### 4) 폐기 사유·폐기율
+- [ ] 폐기 메모를 사유 선택지(유통기한·제조 실수·파손 등)로 바꾸고, 리포트에 폐기율
+
+### 5) 배포 — 시범 매장 전에 필요 (사용자 결정 필요)
+후보: **Supabase 클라우드(서울 리전) + Vercel**. Supabase·Vercel 계정 로그인은 사용자가 직접 해야 한다.
 - [ ] 정할 것: 환경 개수(운영만 / 운영+스테이징), 요금 등급, 주소(기본 `*.vercel.app` / 도메인)
-- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 15개)
+- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 18개)
 - [ ] 인증 설정: 가입 확인 메일 켜기(코드는 대비됨: 세션 없이 오면 확인 메일 안내), 사이트 주소·리디렉트 주소, 운영 SMTP
 - [ ] Vercel 프로젝트: GitHub 연결, 루트 `apps/web`, 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`), 함수 리전 서울
 - [ ] 배포 주소에서 가입~판매 직접 확인. 운영 DB에 E2E 를 돌리지 않는다 (테스트 계정이 생김) — 필요하면 스테이징에서
 - [ ] 마이그레이션 반영 방식 정하기 (처음엔 수동 `supabase db push` 권장)
 - 확인 필요: Supabase 무료 프로젝트는 일정 기간 미사용 시 일시 정지, Vercel 무료(Hobby)는 비상업용 조건. 결정 전에 공식 요금표 확인
 
-### 2) 매출 연동
-- [ ] CSV 업로드: 파일 → 메뉴 매칭(`menus.external_id`) → `record_sales` 를 `source = 'csv'`, `external_id` 로 호출 (`sale_records_external_key` 로 중복 방지). 함수에 source·external_id 인자 추가 필요
-- [ ] 이후 POS 연동 (웹훅 또는 주기 동기화). 메뉴 매칭 화면
+### 6) 경쟁사 분석에서 나온 다음 후보 (우선순위 순)
+- [ ] **판매량 기반 추천 발주**: 지금은 "부족 기준 × 2". → 최근 일평균 사용량 × (입고 소요일 + 여유일). 거래처에 입고 소요일 칸 추가
+- [ ] **거래명세서 사진 → 입고 자동 입력** (AI 판독). 유료 요금제 차별점 후보
+- [ ] **부족·유통기한 알림 발송** (카카오 알림톡 또는 웹 푸시). 지금은 대시보드에서만 보인다
+- [ ] **매장 간 재고 이동 + 여러 매장 통합 대시보드** (소규모 체인용, 높은 요금제 근거)
+- [ ] **직접 만드는 재료** (콜드브루 원액·수제청: "제조" 기록으로 원재료 차감 + 준비 재료 입고). 스키마 변경 필요
+- [ ] **실사 속도**: 휴대폰 카메라 바코드 스캔 (품목에 바코드 칸은 이미 있음). 오프라인은 Expo 단계에서
+- [ ] **레시피북**: 메뉴에 제조 순서·알레르기 (직원 교육용)
+- [ ] **템플릿 확장**: 업종별(베이커리 카페·디저트 카페), 메뉴 엑셀 가져오기
 
-### 3) 분석 (`report:view`)
-- [ ] 기간별 매출·원가·마진, 메뉴별 원가율 추이, 재료 소모량, 폐기율, 실사 차이 추이
-- [ ] 원장에 이미 필요한 데이터가 있다 (`type`, `unit_cost`, `sale_record_id`, `stock_count_id`, `occurred_at`). 기간 경계는 매장 시간대(`storeDayRange`)로
-
-### 4) NestJS 전환
+### 7) NestJS 전환
 - [ ] `apps/api` 추가, Drizzle 스키마(`packages/db`) 재사용. 배포는 상시 서버(Render·Fly.io·Railway 등)
 - [ ] `docs/db-functions.md` 의 대응표대로 기능 하나씩: 서비스 구현(트랜잭션·같은 행 잠금, core 함수 사용) → `lib/api/*` 해당 함수만 API 호출로 교체 → DB 함수 제거
 - [ ] 권한은 Guard + `can()`. Realtime 은 WebSocket/SSE 게이트웨이로 (`subscribeStoreChanges` 시그니처 유지, 판매 취소 방송 트리거도 서비스 이벤트로)
 
-### 5) Expo 앱
+### 8) Expo 앱
 - [ ] 직원이 휴대폰으로 하는 화면부터: 판매 입력, 입출고, 실사. `packages/core` 재사용. 배포는 EAS
 
 ### 완료된 것 (자세한 기록은 `docs/PROGRESS.md`)
@@ -318,15 +355,23 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-07 | `261f6a7` | 매장 설정(이름·시간대), 매장 시간대 기준 날짜 계산, 판매 취소 실시간 반영 |
 | 10-07 | — | 로컬 `db:reset` 으로 마이그레이션 15개 처음부터 적용 확인 (로컬 데이터 전부 삭제) |
 | 10-07 | `38e95f3`, `b4dcb74` | GitHub 공개 저장소, CI(Actions, Node 24 버전) — 첫 실행부터 통과 |
+| 10-08 | `f0db5f8` | 수량 표시 수정: "1L 팩" 같은 단위가 수량과 붙어 "11L 팩"으로 읽히던 문제 → "1 × 1L 팩" |
+| 10-08 | `1255a6f` | 카페 기본 템플릿 (품목 11·메뉴 10·레시피), `apply_store_template`, 매장 만들기 체크·대시보드 버튼 |
+| 10-08 | `89794a1` | 이론 vs 실제 리포트(AvT) `/reports`, `stock_usage_summary`, core `avt.ts` |
+| 10-08 | (이번 커밋) | 입고 단가 변동 알림: `item_cost_changes` 뷰, core `cost-changes.ts`, 입고 직후 알림·대시보드 카드·품목 상세 |
 
 ---
 
 ## 11. 알려진 제한·주의
 
 - **배포 없음** (로컬 전용, §10)
-- 리포트 화면 없음 (`report:view` 권한만 있음)
+- **리포트 금액은 최근 입고 단가 기준**: 기간 중 단가가 바뀌었으면 실제 지출과 조금 다를 수 있다 (메뉴 원가율과 같은 기준). 품목별 차이 금액과 원인별 합계는 각각 반올림해서 1원 정도 안 맞을 수 있다
+- **리포트의 정확도는 판매 입력과 실사에 달렸다**: 판매를 빠뜨리면 이론이 줄어 차이가 커 보이고, 실사를 안 하면 기록 안 된 손실이 안 보인다 (화면에 안내함)
+- 기본 템플릿 메뉴의 양·가격은 예시값이다. 단가는 입고해야 생기므로 불러온 직후 원가는 0원
+- E2E `orders` 시나리오가 3개 병렬 실행 중 한 번 실패 후 재시도에서 통과한 적이 있다 (2026-10-08, 단독 실행 2회는 통과). 반복되면 원인 확인
+- **단가 변동은 "직전 입고"와 비교한다**: 큰 변동 뒤에 단가가 조금(5% 미만) 또 바뀌면 가장 최근 변동이 작은 쪽이 되어 대시보드에서 빠진다. 같은 단가로 다시 입고하는 것은 변동으로 치지 않는다
 - 한 트랜잭션 안에서 입고를 두 번 하면 "최근 입고 단가"가 같은 시각이라 어느 쪽인지 정해지지 않는다 (실제 사용에서는 기록마다 시각이 달라 문제없음)
 - 실사로 늘어난 양은 유통기한 정보 없이 기록된다 (품목 상세에 "유통기한 기록 없음"으로 표시). 입출고 화면의 "조정 → 늘리기"는 유통기한을 넣을 수 있다
 - 삭제·상태 변경 버튼(`ActionButton`)의 알림이 화면 갱신보다 아주 조금 먼저 뜬다. 사용에는 문제없다 (E2E 는 바뀐 내용을 기다린다, §8)
-- **Supabase CLI 버전**: `npx supabase` 는 그때그때 최신 CLI 를 받는다. 2026-10-07 에 받은 새 버전은 `pnpm db:types` 결과에 모든 테이블 `ComputedFields: never` 를 더한다 (스키마 변화 없음). 타입 파일 diff 가 이것뿐이면 커밋하지 않았다. CLI 를 devDependency 로 고정할지는 아직 정하지 않음
+- **Supabase CLI 버전**: `npx supabase` 는 그때그때 최신 CLI 를 받는다. 2026-10-07 에 받은 새 버전은 `pnpm db:types` 결과에 모든 테이블 `ComputedFields: never` 를 더한다 (스키마 변화 없음). 2026-10-08 커밋(`1255a6f`)부터 이 줄들이 타입 파일에 포함돼 있다. CLI 를 devDependency 로 고정할지는 아직 정하지 않음
 - **CI 러너**: GitHub 안내에 따르면 2026-10-19 부터 `ubuntu-latest` 가 Ubuntu 26 으로 바뀐다. 이후 CI(특히 E2E 의 Chrome·Docker)가 깨지면 `runs-on: ubuntu-24.04` 로 고정해 되돌린다

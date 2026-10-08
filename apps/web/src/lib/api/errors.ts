@@ -2,7 +2,8 @@
 export class ApiError extends Error {}
 
 /** 서버 액션의 공통 반환 형태 */
-export type ActionState = { error?: string; ok?: boolean; message?: string } | undefined;
+/** notice: 성공 알림 아래에 덧붙여 조금 더 오래 보여줄 안내 (예: 입고 단가 변동) */
+export type ActionState = { error?: string; ok?: boolean; message?: string; notice?: string } | undefined;
 
 // Supabase Auth 오류 코드 → 한국어 메시지
 const AUTH_MESSAGES: Record<string, string> = {

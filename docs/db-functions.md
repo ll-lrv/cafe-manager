@@ -272,7 +272,7 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 |---|---|---|---|
 | Realtime 구독 | `apps/web/src/lib/api/realtime.ts` `subscribeStoreChanges()` → `components/realtime-refresh.tsx`, `subscribeStockCount()` → 실사 화면 | `stock_movements`, `items` 변경과 `sale_records` 추가(내 매장, RLS 적용)를 받아 화면을 새로고침. 필터가 걸린 구독에는 삭제 이벤트가 오지 않아, 판매 취소는 DB 트리거가 비공개 채널 `store:<id>` 로 방송한 것을 받는다 | 원장 기록·품목 변경 후 서비스가 이벤트를 내고, WebSocket/SSE 게이트웨이로 매장별 방송. `subscribeStoreChanges` 의 시그니처(매장 ID, 콜백 → 구독 해제 함수)는 그대로 두고 안만 바꾼다 |
 | 구독 대상 테이블 | `..._supabase_auth_rls.sql`, `..._record_sales.sql`, `..._stock_count_realtime.sql` 의 `ALTER PUBLICATION supabase_realtime` | stock_movements, items, sale_records, stock_count_lines 방송 | 게이트웨이로 옮기면 publication 에서 뺀다 |
-| 재고 집계 뷰 | `item_stock_levels`, `lot_stock_levels`, `item_latest_costs` (`inventory.ts`), `stock_count_line_books` (`counts.ts`) | 원장 합계로 현재 재고·로트 잔량, 품목별 최근 입고 단가(메뉴 원가용), 실사 줄의 센 시각 장부 | 뷰는 그대로 쓴다 (PostgreSQL 뷰, `security_invoker`) |
+| 재고 집계 뷰 | `item_stock_levels`, `lot_stock_levels`, `item_latest_costs`, `item_cost_changes` (`inventory.ts`), `stock_count_line_books` (`counts.ts`) | 원장 합계로 현재 재고·로트 잔량, 품목별 최근 입고 단가(메뉴 원가용), 품목별 가장 최근 단가 변동(직전 단가·바뀐 시각, 단가 알림용), 실사 줄의 센 시각 장부 | 뷰는 그대로 쓴다 (PostgreSQL 뷰, `security_invoker`) |
 
 ## 앞으로 추가할 함수 (예정)
 

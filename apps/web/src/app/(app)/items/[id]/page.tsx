@@ -3,15 +3,18 @@ import { ArrowRightLeft, CircleCheck } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CostChangeBadge, CostImpactList } from "@/components/cost-alerts";
 import { ExpiryBadge, StockStatusBadge } from "@/components/stock-badges";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getItem, isItemInUse, listCategories } from "@/lib/api/catalog";
+import { getLatestCosts, listCostChanges, listMenus } from "@/lib/api/menus";
 import { getStockLevels, listLotLevels, listMovements } from "@/lib/api/stock";
 import { listSuppliers } from "@/lib/api/suppliers";
 import { requireCurrentStore } from "@/lib/api/stores";
+import { buildCostAlerts, unitPriceText } from "@/lib/cost-alerts";
 import { storeToday, toLotView } from "@/lib/inventory";
 import { MovementList } from "../../stock/movement-list";
 import { BackLink } from "../back-link";
@@ -27,12 +30,22 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
     listSuppliers(store.storeId),
   ]);
   if (!item) notFound();
-  const [inUse, stock, movements, lotLevels] = await Promise.all([
+  const canViewCosts = can(store.role, "report:view");
+  const [inUse, stock, movements, lotLevels, costData] = await Promise.all([
     isItemInUse(item.id),
     getStockLevels(store.storeId),
     listMovements(store.storeId, { itemId: item.id, limit: 10 }),
     item.trackExpiry ? listLotLevels(store.storeId, { itemId: item.id }) : Promise.resolve([]),
+    canViewCosts
+      ? Promise.all([listCostChanges(store.storeId, { itemId: item.id }), listMenus(store.storeId), getLatestCosts(store.storeId)])
+      : Promise.resolve(null),
   ]);
+  const latestCost = costData?.[2][item.id];
+  // 가장 최근 단가 변동 (알림 기준보다 작아도 보여준다)
+  const costChange = costData
+    ? buildCostAlerts(costData[0], [item], costData[1], costData[2], { notableOnly: false })[0]
+    : undefined;
+  const dayFormat = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", timeZone: store.timeZone });
   const quantity = stock[item.id] ?? 0;
   const defaultUnit = item.units.find((u) => u.isDefaultPurchase) ?? null;
   const fmt = (n: number) => formatQuantity(n, item.baseUnit, defaultUnit);
@@ -114,6 +127,29 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
               </Link>
             )}
           </CardContent>
+        </Card>
+      )}
+
+      {!item.archivedAt && latestCost !== undefined && (
+        <Card>
+          <CardHeader>
+            <CardDescription>입고 단가 (최근 입고 기준)</CardDescription>
+            <CardTitle className="text-lg font-bold tabular-nums">{unitPriceText(latestCost, item)}</CardTitle>
+            {costChange && (
+              <CardDescription className="flex flex-wrap items-center gap-1.5">
+                <span>
+                  {dayFormat.format(new Date(costChange.changedAt))}에 {costChange.priceBefore}에서
+                </span>
+                <CostChangeBadge percent={costChange.percent} />
+              </CardDescription>
+            )}
+          </CardHeader>
+          {costChange && (
+            <CardContent className="grid gap-2">
+              <h2 className="text-sm font-medium">이 변동으로 바뀐 메뉴 원가</h2>
+              <CostImpactList alert={costChange} />
+            </CardContent>
+          )}
         </Card>
       )}
 

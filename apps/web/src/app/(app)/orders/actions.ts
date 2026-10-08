@@ -19,6 +19,7 @@ import {
 } from "@/lib/api/purchasing";
 import { getStockLevels } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
+import { costNoticeAfterReceive } from "@/lib/cost-notice";
 import { buildOrderSuggestions } from "@/lib/order-suggestions";
 
 /** 화면에서 숨겨도 요청은 직접 보낼 수 있으므로 서버에서 한 번 더 확인한다. (DB 함수·RLS가 최종 확인) */
@@ -179,7 +180,7 @@ export async function changeStatusAction(_prev: ActionState, formData: FormData)
 
 export async function receiveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    await requirePurchaser();
+    const store = await requirePurchaser();
     const orderId = text(formData, "orderId");
     let lines: ReceiveLineInput[];
     try {
@@ -194,6 +195,12 @@ export async function receiveAction(_prev: ActionState, formData: FormData): Pro
     } catch {
       throw new ApiError("입고 수량을 확인해 주세요.");
     }
+    // 단가 변동 알림을 위해 이번에 들어온 품목의 입고 전 단가를 받아 둔다.
+    const order = await getPurchaseOrder(store.storeId, orderId);
+    const receivedLineIds = new Set(lines.filter((l) => l.quantity > 0).map((l) => l.lineId));
+    const itemIds = (order?.lines ?? []).filter((l) => receivedLineIds.has(l.id)).map((l) => l.itemId);
+    const costsBefore = itemIds.length > 0 ? await getLatestCosts(store.storeId, { itemIds }) : {};
+
     const status = await receiveOrder(orderId, lines);
     revalidateOrder(orderId);
     revalidatePath("/stock");
@@ -201,6 +208,7 @@ export async function receiveAction(_prev: ActionState, formData: FormData): Pro
     return {
       ok: true,
       message: status === "received" ? "입고를 마쳤습니다. 재고에 반영했습니다." : "일부 입고를 기록했습니다. 남은 수량은 나중에 입고하세요.",
+      notice: itemIds.length > 0 ? await costNoticeAfterReceive(store.storeId, itemIds, costsBefore) : undefined,
     };
   } catch (e) {
     return toActionError(e);

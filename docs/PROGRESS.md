@@ -142,6 +142,17 @@
 - 읽기 전용 SQL 함수 `stock_usage_summary`(집계만), 계산은 core `avt.ts` (테스트 4개)
 - 확인: 전체 E2E 10개 통과 (새 시나리오 `reports`: 손으로 계산한 금액·원가율·원인과 일치, 앞 실사 조정이 구간에서 빠지는 것 확인)
 
+### 13. 입고 단가 변동 알림 (2026-10-08)
+- 유료화 순서 ②. 입고 단가가 직전 입고보다 5% 이상 오르거나 내리면 그 품목을 쓰는 메뉴의 원가율 변화를 보여준다 (예: "우유 단가 +8% (1팩 2,600원 → 2,808원). 밀크티 원가율 15.6% → 16.8% 외 메뉴 1개")
+- 뷰 `item_cost_changes`: 품목별 가장 최근 단가 변동 (직전 단가, 지금 단가, 바뀐 시각). 같은 단가로 다시 입고한 것은 변동이 아니다
+- core `cost-changes.ts`: `costChangePercent`, `isNotableCostChange`, `menuCostImpacts`, 기준 `COST_ALERT_PERCENT = 5`·`COST_ALERT_DAYS = 14` (테스트 2개 추가, 31개)
+- 보여주는 곳 (사장·매니저, `report:view`)
+  - 입고 직후 알림: 입출고 화면 입고, 발주 입고. 입고 전·후 최근 단가를 비교 (`lib/cost-notice.ts`). 알림 아래 안내로 12초
+  - 대시보드 "입고 단가 변동 N건": 최근 14일, 품목별 변화율 배지·팩 가격·메뉴 원가율 (메뉴 3개까지)
+  - 품목 상세 "입고 단가": 지금 단가(기본 입고 단위), 가장 최근 변동(기준 미만도), 바뀐 메뉴 원가
+- 공용: 액션 결과에 `notice`(알림 아래 안내) 추가, 토스트 띄우는 곳 세 군데를 `form-parts.tsx` 의 함수 하나로
+- 확인: SQL로 뷰 검증(같은 단가 재입고 무시, 바뀐 시각 = 새 단가 첫 입고) + 새 E2E 시나리오 `costs`(기준 미만 무알림, 오름·내림 알림 문구, 대시보드·품목 상세, 발주 입고 알림, 직원에게 안 보임, 모바일) + 전체 E2E 11개 통과
+
 ## 다시 시작하는 방법
 
 처음 받는 PC라면 `git clone https://github.com/ll-lrv/cafe-manager.git` 후 `pnpm install`.
@@ -158,20 +169,21 @@
    → http://localhost:3000 · DB 보기: Supabase Studio http://127.0.0.1:55323
 4. 처음부터 깨끗한 DB가 필요하면 `pnpm db:reset` (모든 계정·데이터 삭제)
 
-로컬 DB는 2026-10-07 에 비웠다. 화면을 써 보려면 새로 가입해 매장을 만든다.
+로컬 DB는 2026-10-07 에 비웠고, 2026-10-08 에 데모 계정을 하나 만들었다: `demo-owner@cafe.kr` / `test1234` ("데모 카페").
 
 `apps/web/.env.local` 은 git에 없다. 새로 받은 경우 `.env.example` 을 복사하고
 `npx supabase status` 의 Publishable key 를 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 에 넣는다.
 
 ## 다음 할 일
 
-재고관리 MVP와 MVP 다듬기는 끝났다. 자세한 순서·체크리스트는 `docs/HANDOVER.md` §10.
+재고관리 MVP는 끝났고, 유료화 기능을 붙이는 중이다. 제품 방향(수익화·경쟁사 분석)과 자세한 체크리스트는 `docs/HANDOVER.md` §10.
 
-1. **배포**: 후보 Supabase 클라우드(서울) + Vercel. 환경 개수·요금 등급·주소를 사용자와 정한 뒤 진행
-2. **매출 연동**: CSV 업로드 → `record_sales` 를 `source = 'csv'`, `external_id` 로 중복 방지하며 호출. 이후 POS 연동
-3. **분석**: 기간별 매출·원가·마진, 메뉴별 원가율 추이, 재료 소모·폐기율
-4. **NestJS 전환 시작**: `docs/db-functions.md` 의 대응표대로 기능 단위로 옮긴다
-5. **앱(Expo)**: 판매 입력·입출고·실사처럼 직원이 휴대폰으로 하는 화면부터
+1. **CSV 판매 업로드** (다음 작업): `record_sales` 를 `source = 'csv'`, `external_id` 로 중복 방지하며 호출. 이후 POS 연동
+2. **메뉴 수익성 순위**: 판매량 × 개당 마진, `/reports` 에 탭으로
+3. **폐기 사유·폐기율**
+4. **배포 + 시범 매장 2~3곳 2주 사용**: 후보 Supabase 클라우드(서울) + Vercel. 환경 개수·요금 등급·주소를 사용자와 정한 뒤 진행
+5. 경쟁사 분석 후보: 판매량 기반 추천 발주, 거래명세서 사진 입고, 알림 발송, 매장 간 이동, 직접 만드는 재료, 바코드 스캔, 레시피북, 템플릿 확장
+6. **NestJS 전환**, **앱(Expo)**: 이전 계획 그대로
 
 ## 메모
 - 이 PC에는 다른 Supabase 프로젝트(`cafe-manager_simple`)와 `cafe-postgres` 컨테이너가 있다. Docker를 켜면 같이 켜진다. 건드리지 않았다.

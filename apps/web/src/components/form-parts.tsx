@@ -92,12 +92,22 @@ export function NativeSelect({ className, ...props }: React.ComponentProps<"sele
   );
 }
 
+/** 서버 액션 결과를 토스트로 띄운다. 덧붙인 안내(notice)가 있으면 아래에 보여주고 더 오래 남긴다. */
+function toastResult(state: ActionState) {
+  if (state?.error) toast.error(state.error);
+  else if (state?.message) {
+    toast.success(
+      state.message,
+      state.notice
+        ? { description: state.notice, duration: 12_000, classNames: { description: "whitespace-pre-line" } }
+        : undefined,
+    );
+  }
+}
+
 /** 서버 액션 결과를 토스트로 보여준다. */
 export function useToastResult(state: ActionState) {
-  useEffect(() => {
-    if (state?.error) toast.error(state.error);
-    else if (state?.message) toast.success(state.message);
-  }, [state]);
+  useEffect(() => toastResult(state), [state]);
 }
 
 /**
@@ -108,14 +118,11 @@ export function useToastResult(state: ActionState) {
  */
 export function useFormAction<T extends NonNullable<ActionState> = NonNullable<ActionState>>(
   action: (prev: T | undefined, formData: FormData) => Promise<T | undefined>,
-  { resetOnSuccess = false, toastResult = false }: { resetOnSuccess?: boolean; toastResult?: boolean } = {},
+  { resetOnSuccess = false, toastResult: toastOnDone = false }: { resetOnSuccess?: boolean; toastResult?: boolean } = {},
 ) {
   const [state, dispatch, pending] = useActionState<T | undefined, FormData>(async (prev, formData) => {
     const result = await action(prev, formData);
-    if (toastResult) {
-      if (result?.error) toast.error(result.error);
-      else if (result?.message) toast.success(result.message);
-    }
+    if (toastOnDone) toastResult(result);
     return result;
   }, undefined);
   const formRef = useRef<HTMLFormElement>(null);
@@ -173,8 +180,7 @@ export function ActionButton({
         for (const [key, value] of Object.entries(fields)) formData.set(key, value);
         startActionTransition(async () => {
           const result = await action(undefined, formData);
-          if (result?.error) toast.error(result.error);
-          else if (result?.message) toast.success(result.message);
+          toastResult(result);
         });
       }}
     >

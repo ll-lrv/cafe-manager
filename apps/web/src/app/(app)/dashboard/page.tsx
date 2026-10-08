@@ -1,18 +1,21 @@
-import { can, EXPIRY_SOON_DAYS, formatQuantity } from "@cafe/core";
+import { can, COST_ALERT_DAYS, COST_ALERT_PERCENT, EXPIRY_SOON_DAYS, formatQuantity } from "@cafe/core";
 import { ArrowRightLeft, ClipboardList, Receipt } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CostAlertList } from "@/components/cost-alerts";
 import { ActionButton } from "@/components/form-parts";
 import { ExpiryBadge, StockStatusBadge } from "@/components/stock-badges";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listItems } from "@/lib/api/catalog";
 import { listStockCounts } from "@/lib/api/counts";
+import { getLatestCosts, listCostChanges, listMenus } from "@/lib/api/menus";
 import { listPurchaseOrders } from "@/lib/api/purchasing";
 import { listSales } from "@/lib/api/sales";
 import { getStockLevels, listLotLevels, listMovements } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { requireUser } from "@/lib/api/session";
+import { buildCostAlerts } from "@/lib/cost-alerts";
 import { buildItemLevels, storeDayRange, storeToday, toLotView } from "@/lib/inventory";
 import { dayLabel } from "../orders/status";
 import { MovementList } from "../stock/movement-list";
@@ -37,7 +40,8 @@ export default async function DashboardPage() {
   const [user, store] = await Promise.all([requireUser(), requireCurrentStore()]);
   const today = storeToday(store.timeZone);
   const canPurchase = can(store.role, "purchase:manage");
-  const [items, stock, lotLevels, movements, todaySales, counts, incoming] = await Promise.all([
+  const canViewCosts = can(store.role, "report:view");
+  const [items, stock, lotLevels, movements, todaySales, counts, incoming, costData] = await Promise.all([
     listItems(store.storeId),
     getStockLevels(store.storeId),
     listLotLevels(store.storeId),
@@ -45,6 +49,9 @@ export default async function DashboardPage() {
     listSales(store.storeId, storeDayRange(today, store.timeZone)),
     listStockCounts(store.storeId, 1),
     canPurchase ? listPurchaseOrders(store.storeId, { statuses: ["ordered", "partially_received"] }) : Promise.resolve([]),
+    canViewCosts
+      ? Promise.all([listCostChanges(store.storeId, { withinDays: COST_ALERT_DAYS }), listMenus(store.storeId), getLatestCosts(store.storeId)])
+      : Promise.resolve(null),
   ]);
   // 입고 예정일 순 (없으면 뒤로)
   const incomingSorted = [...incoming].sort((a, b) => (a.expectedOn ?? "9999").localeCompare(b.expectedOn ?? "9999"));
@@ -53,6 +60,8 @@ export default async function DashboardPage() {
   const todayAmount = todaySales.reduce((sum, s) => sum + s.amount, 0);
 
   const activeItems = items.filter((i) => !i.archivedAt);
+  // 최근 바뀐 입고 단가 (알림 기준 이상). 메뉴 원가율이 어떻게 바뀌었는지 함께 보여준다.
+  const costAlerts = costData ? buildCostAlerts(costData[0], items, costData[1], costData[2]) : [];
   const itemById = new Map(activeItems.map((i) => [i.id, i]));
   const levels = buildItemLevels(activeItems, stock, lotLevels, today);
   const fmt = (itemId: string, n: number) => {
@@ -198,6 +207,23 @@ export default async function DashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {costAlerts.length > 0 && (
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>입고 단가 변동 {costAlerts.length}건</CardTitle>
+                <CardDescription>
+                  최근 {COST_ALERT_DAYS}일 동안 직전 입고보다 {COST_ALERT_PERCENT}% 이상 바뀐 단가와 메뉴 원가율 변화
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CostAlertList alerts={costAlerts.slice(0, LIMIT)} timeZone={store.timeZone} />
+                {costAlerts.length > LIMIT && (
+                  <p className="pt-2 text-sm text-muted-foreground">외 {costAlerts.length - LIMIT}건</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {canPurchase && incomingSorted.length > 0 && (
             <Card className="md:col-span-2">

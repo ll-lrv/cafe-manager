@@ -190,15 +190,55 @@ export async function removeRecipeIngredient(storeId: string, menuId: string, it
 
 // ---------------------------------------------------------------- 원가
 
-/** 품목별 최근 입고 단가 (기본 단위 1개당 원). 입고 단가를 기록한 적이 없으면 빠진다. */
-export async function getLatestCosts(storeId: string): Promise<Record<string, number>> {
+/**
+ * 품목별 최근 입고 단가 (기본 단위 1개당 원). 입고 단가를 기록한 적이 없으면 빠진다.
+ * itemIds 를 주면 그 품목만.
+ */
+export async function getLatestCosts(
+  storeId: string,
+  { itemIds }: { itemIds?: string[] } = {},
+): Promise<Record<string, number>> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("item_latest_costs")
-    .select("item_id, unit_cost")
-    .eq("store_id", storeId);
+  let query = supabase.from("item_latest_costs").select("item_id, unit_cost").eq("store_id", storeId);
+  if (itemIds) query = query.in("item_id", itemIds);
+  const { data, error } = await query;
+  if (error?.code === "22P02") return {};
   if (error) throw new ApiError(dbErrorMessage(error));
   return Object.fromEntries(
     data.flatMap((r) => (r.item_id && r.unit_cost !== null ? [[r.item_id, r.unit_cost]] : [])),
+  );
+}
+
+export interface CostChange {
+  itemId: string;
+  /** 기본 단위 1개당 원 */
+  previousUnitCost: number;
+  unitCost: number;
+  /** 지금 단가로 처음 입고한 시각 */
+  changedAt: string;
+}
+
+/** 품목별 가장 최근 입고 단가 변동. withinDays 를 주면 최근 그 기간 안에 바뀐 것만, itemId 를 주면 그 품목만 */
+export async function listCostChanges(
+  storeId: string,
+  { withinDays, itemId }: { withinDays?: number; itemId?: string } = {},
+): Promise<CostChange[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("item_cost_changes")
+    .select("item_id, previous_unit_cost, unit_cost, changed_at")
+    .eq("store_id", storeId)
+    .order("changed_at", { ascending: false });
+  if (withinDays !== undefined) {
+    query = query.gte("changed_at", new Date(Date.now() - withinDays * 24 * 60 * 60 * 1000).toISOString());
+  }
+  if (itemId) query = query.eq("item_id", itemId);
+  const { data, error } = await query;
+  if (error?.code === "22P02") return [];
+  if (error) throw new ApiError(dbErrorMessage(error));
+  return data.flatMap((r) =>
+    r.item_id && r.previous_unit_cost !== null && r.unit_cost !== null && r.changed_at
+      ? [{ itemId: r.item_id, previousUnitCost: r.previous_unit_cost, unitCost: r.unit_cost, changedAt: r.changed_at }]
+      : [],
   );
 }

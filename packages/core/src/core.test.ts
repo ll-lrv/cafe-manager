@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   allocateFifo,
   can,
+  costChangePercent,
   costRate,
   countAdjustments,
+  isNotableCostChange,
+  menuCostImpacts,
   dateInTimeZone,
   daysUntilExpiry,
   expiryLabel,
@@ -245,6 +248,34 @@ describe("recipe cost", () => {
   it("원가율을 소수 첫째 자리까지 계산한다", () => {
     expect(costRate(5000, 1030)).toBe(20.6);
     expect(costRate(0, 100)).toBeNull();
+  });
+});
+
+describe("cost changes", () => {
+  it("단가 변화율과 알림 기준", () => {
+    expect(costChangePercent(2500, 2700)).toBe(8);
+    expect(costChangePercent(2.5, 2.4)).toBe(-4);
+    expect(costChangePercent(0, 100)).toBeNull();
+    expect(isNotableCostChange(2500, 2700)).toBe(true);
+    expect(isNotableCostChange(2500, 2600)).toBe(false); // +4%
+    expect(isNotableCostChange(100, 95)).toBe(true); // -5% 는 기준에 걸린다
+    expect(isNotableCostChange(0, 100)).toBe(true);
+    expect(isNotableCostChange(100, 100)).toBe(false);
+  });
+
+  it("그 품목을 쓰는 메뉴의 원가율 변화만, 많이 바뀐 순으로", () => {
+    const menus = [
+      { id: "americano", name: "아메리카노", price: 4000, recipe: [{ itemId: "beans", quantity: 18 }, { itemId: "cup", quantity: 1 }] },
+      { id: "latte", name: "카페라떼", price: 5000, recipe: [{ itemId: "beans", quantity: 18 }, { itemId: "milk", quantity: 200 }, { itemId: "cup", quantity: 1 }] },
+      { id: "milk-tea", name: "밀크티", price: 2000, recipe: [{ itemId: "milk", quantity: 200 }] },
+      { id: "service", name: "서비스 우유", price: 0, recipe: [{ itemId: "milk", quantity: 100 }] },
+    ];
+    const costs = { beans: 25, milk: 2.7, cup: 80 };
+    expect(menuCostImpacts(menus, "milk", 2.5, costs)).toEqual([
+      { menuId: "milk-tea", menuName: "밀크티", costBefore: 500, costAfter: 540, rateBefore: 25, rateAfter: 27 },
+      { menuId: "latte", menuName: "카페라떼", costBefore: 1030, costAfter: 1070, rateBefore: 20.6, rateAfter: 21.4 },
+      { menuId: "service", menuName: "서비스 우유", costBefore: 250, costAfter: 270, rateBefore: null, rateAfter: null },
+    ]);
   });
 });
 
