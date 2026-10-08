@@ -208,7 +208,7 @@ export async function receiveAction(_prev: ActionState, formData: FormData): Pro
     return {
       ok: true,
       message: status === "received" ? "입고를 마쳤습니다. 재고에 반영했습니다." : "일부 입고를 기록했습니다. 남은 수량은 나중에 입고하세요.",
-      notice: itemIds.length > 0 ? await costNoticeAfterReceive(store.storeId, itemIds, costsBefore) : undefined,
+      notice: itemIds.length > 0 ? await costNoticeAfterReceive(store, itemIds, costsBefore) : undefined,
     };
   } catch (e) {
     return toActionError(e);

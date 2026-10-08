@@ -2,17 +2,14 @@ import { avtLine, avtSummary, can, formatQuantity, sortAvtLines, type AvtLine } 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { listItems, type Item } from "@/lib/api/catalog";
-import { listStockCounts } from "@/lib/api/counts";
 import { getLatestCosts } from "@/lib/api/menus";
-import { getUsageTotals } from "@/lib/api/reports";
-import { listSales } from "@/lib/api/sales";
+import { getMenuSales, getUsageTotals } from "@/lib/api/reports";
 import { requireCurrentStore } from "@/lib/api/stores";
-import { addDays, isValidDate, storeDayRange, storeToday } from "@/lib/inventory";
 import { cn } from "@/lib/utils";
+import { resolvePeriods } from "./periods";
+import { PeriodPicker, ReportTabs, signedWon, SummaryCard, won } from "./report-parts";
 
 export const metadata: Metadata = { title: "이론 vs 실제" };
 
@@ -20,77 +17,21 @@ export const metadata: Metadata = { title: "이론 vs 실제" };
 const WARN_RATE = 0.05;
 const ALERT_RATE = 0.1;
 
-const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
-const signedWon = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("ko-KR")}원`;
 const percent = (r: number) => `${(r * 100).toFixed(1)}%`;
-
-interface Period {
-  key: string;
-  label: string;
-  href: string;
-  range: { from: string; to: string };
-}
-
-/** 실사 완료 시각 바로 뒤 (그 실사의 조정은 완료 시각에 기록되므로, 구간을 (앞 실사, 이번 실사] 로 자르기 위해) */
-const justAfter = (iso: string) => new Date(Date.parse(iso) + 1).toISOString();
 
 export default async function ReportsPage({ searchParams }: PageProps<"/reports">) {
   const [params, store] = await Promise.all([searchParams, requireCurrentStore()]);
   if (!can(store.role, "report:view")) {
     return <p className="text-sm text-muted-foreground">리포트는 사장과 매니저만 볼 수 있습니다.</p>;
   }
-  const today = storeToday(store.timeZone);
-  const dayLabel = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone: store.timeZone });
-  const dateText = (date: string) => dayLabel.format(new Date(`${date}T12:00:00Z`));
-  const days = (from: string, to: string) => ({
-    from: storeDayRange(from, store.timeZone).from,
-    to: storeDayRange(to, store.timeZone).to,
-  });
-
-  // 실사 구간: 끝난 실사 두 개 사이 (최근 것부터 3개)
-  const completed = (await listStockCounts(store.storeId))
-    .filter((c) => c.status === "completed" && c.completedAt)
-    .sort((a, b) => Date.parse(b.completedAt!) - Date.parse(a.completedAt!));
-  const countPeriods: Period[] = completed.slice(0, 3).flatMap((c, i) => {
-    const prev = completed[i + 1];
-    if (!prev) return [];
-    return [{
-      key: `count:${c.id}`,
-      label: `실사 ${dayLabel.format(new Date(prev.completedAt!))} → ${dayLabel.format(new Date(c.completedAt!))}${c.categoryName ? ` (${c.categoryName})` : ""}`,
-      href: `/reports?count=${c.id}`,
-      range: { from: justAfter(prev.completedAt!), to: justAfter(c.completedAt!) },
-    }];
-  });
-  const datePeriods: Period[] = [
-    { key: "7", label: "최근 7일", from: addDays(today, -6) },
-    { key: "30", label: "최근 30일", from: addDays(today, -29) },
-    { key: "month", label: "이번 달", from: `${today.slice(0, 8)}01` },
-  ].map((p) => ({ key: `days:${p.from}:${today}`, label: p.label, href: `/reports?from=${p.from}&to=${today}`, range: days(p.from, today) }));
-
-  // 기간 고르기: 실사 구간 → 날짜 → 기본(가장 최근 실사 구간, 없으면 최근 7일)
-  let period: Period;
-  const fromParam = typeof params.from === "string" ? params.from : undefined;
-  const toParam = typeof params.to === "string" ? params.to : undefined;
-  const byCount = countPeriods.find((p) => p.key === `count:${params.count}`);
-  if (byCount) {
-    period = byCount;
-  } else if (isValidDate(fromParam) && isValidDate(toParam) && fromParam <= toParam && toParam <= today) {
-    period = datePeriods.find((p) => p.key === `days:${fromParam}:${toParam}`) ?? {
-      key: `days:${fromParam}:${toParam}`,
-      label: `${dateText(fromParam)} ~ ${dateText(toParam)}`,
-      href: `/reports?from=${fromParam}&to=${toParam}`,
-      range: days(fromParam, toParam),
-    };
-  } else {
-    period = countPeriods[0] ?? datePeriods[0];
-  }
-  const customFrom = period.key.startsWith("days:") ? period.key.split(":")[1] : addDays(today, -6);
+  const periods = await resolvePeriods(store, params, { basePath: "/reports", withCounts: true, defaultDays: 7 });
+  const { period } = periods;
 
   const [items, totals, costs, sales] = await Promise.all([
     listItems(store.storeId),
     getUsageTotals(store.storeId, period.range),
     getLatestCosts(store.storeId),
-    listSales(store.storeId, period.range),
+    getMenuSales(store.storeId, period.range),
   ]);
   const itemById = new Map(items.map((i) => [i.id, i]));
   const lines = sortAvtLines(
@@ -103,7 +44,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
   const summary = avtSummary(lines, revenue);
   // DB 시각(마이크로초, +00:00)과 ISO 문자열은 형식이 달라 문자열로 비교하지 않는다
   const inRange = (iso: string) => Date.parse(iso) >= Date.parse(period.range.from) && Date.parse(iso) < Date.parse(period.range.to);
-  const hasCount = completed.some((c) => inRange(c.completedAt!));
+  const hasCount = periods.completedCounts.some((c) => inRange(c.completedAt));
   const causeTexts = (
     [
       ["레시피 밖 사용", summary.causeCosts.consumed],
@@ -117,6 +58,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
   return (
     <div className="grid gap-6">
+      <ReportTabs active="/reports" />
       <div>
         <h1 className="text-xl font-bold">이론 vs 실제 사용량</h1>
         <p className="text-sm text-muted-foreground">
@@ -125,30 +67,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         </p>
       </div>
 
-      <div className="grid gap-3">
-        <div className="flex flex-wrap gap-2">
-          {[...countPeriods, ...datePeriods].map((p) => (
-            <Link
-              key={p.key}
-              href={p.href}
-              className={cn(
-                "rounded-full border px-3 py-1 text-sm transition-colors",
-                p.key === period.key ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted",
-              )}
-            >
-              {p.label}
-            </Link>
-          ))}
-        </div>
-        <form className="flex flex-wrap items-center gap-2 text-sm" action="/reports">
-          <Input type="date" name="from" defaultValue={customFrom} max={today} aria-label="시작일" className="w-auto" />
-          <span>~</span>
-          <Input type="date" name="to" defaultValue={period.key.startsWith("days:") ? period.key.split(":")[2] : today} max={today} aria-label="종료일" className="w-auto" />
-          <Button type="submit" variant="outline" size="sm">
-            보기
-          </Button>
-        </form>
-      </div>
+      <PeriodPicker periods={periods} basePath="/reports" />
 
       {!hasCount && (
         <p className="rounded-lg border border-amber-500/50 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
@@ -200,18 +119,6 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function SummaryCard({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "bad" }) {
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className={cn("text-xl font-bold tabular-nums", tone === "bad" && "text-destructive")}>{value}</CardTitle>
-        <p className="text-xs text-muted-foreground">{sub}</p>
-      </CardHeader>
-    </Card>
   );
 }
 

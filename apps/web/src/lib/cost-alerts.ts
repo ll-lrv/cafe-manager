@@ -1,7 +1,9 @@
 import {
   BASE_UNIT_LABEL,
   costChangePercent,
+  effectiveTargetRate,
   isNotableCostChange,
+  isOverTarget,
   menuCostImpacts,
   oneUnitLabel,
   roundQty,
@@ -21,8 +23,17 @@ export interface CostAlert {
   /** 단위 하나 가격. 예) "25,000원" */
   priceBefore: string;
   priceAfter: string;
-  /** 이 품목을 쓰는 메뉴(보관 제외)의 원가율 변화 */
-  impacts: MenuCostImpact[];
+  /** 이 품목을 쓰는 메뉴(보관 제외)의 원가율 변화. 이번 변동으로 목표를 넘은 메뉴가 먼저 */
+  impacts: CostAlertImpact[];
+}
+
+export interface CostAlertImpact extends MenuCostImpact {
+  /** 메뉴의 목표 원가율(%) */
+  target: number;
+  /** 바뀐 뒤 원가율이 목표를 넘는다 */
+  overTarget: boolean;
+  /** 이번 변동으로 목표를 넘게 됐다 (전에는 목표 안) */
+  crossedTarget: boolean;
 }
 
 /** 기본 단위 1개당 원가를 기본 입고 단위 가격으로. 예) 25원/g, 1봉=1000g → { unit: "1봉", price: "25,000원" } */
@@ -44,17 +55,23 @@ export const priceChangeText = (a: Pick<CostAlert, "unit" | "priceBefore" | "pri
 
 /**
  * 단가 변동을 화면에 보여줄 알림으로. notableOnly 면 알림 기준(COST_ALERT_PERCENT) 이상인 것만.
- * 보관된 품목은 뺀다.
+ * 보관된 품목은 뺀다. storeTargetRate 는 매장 기본 목표 원가율(%) (메뉴에 따로 정하지 않았을 때)
  */
 export function buildCostAlerts(
   changes: CostChange[],
   items: Item[],
   menus: Menu[],
   costs: Record<string, number>,
-  { notableOnly = true }: { notableOnly?: boolean } = {},
+  { storeTargetRate, notableOnly = true }: { storeTargetRate: number; notableOnly?: boolean },
 ): CostAlert[] {
   const itemById = new Map(items.filter((i) => !i.archivedAt).map((i) => [i.id, i]));
   const activeMenus = menus.filter((m) => !m.archivedAt);
+  const targetOf = new Map(activeMenus.map((m) => [m.id, effectiveTargetRate(m.targetCostRate, storeTargetRate)]));
+  const withTarget = (i: MenuCostImpact): CostAlertImpact => {
+    const target = targetOf.get(i.menuId)!;
+    const overTarget = isOverTarget(i.rateAfter, target);
+    return { ...i, target, overTarget, crossedTarget: overTarget && !isOverTarget(i.rateBefore, target) };
+  };
   return changes.flatMap((c) => {
     const item = itemById.get(c.itemId);
     if (!item) return [];
@@ -68,7 +85,10 @@ export function buildCostAlerts(
         unit: unitPrice(c.unitCost, item).unit,
         priceBefore: unitPrice(c.previousUnitCost, item).price,
         priceAfter: unitPrice(c.unitCost, item).price,
-        impacts: menuCostImpacts(activeMenus, c.itemId, c.previousUnitCost, costs),
+        // 목표를 새로 넘은 메뉴를 먼저 (나머지는 원가율이 많이 바뀐 순 그대로)
+        impacts: menuCostImpacts(activeMenus, c.itemId, c.previousUnitCost, costs)
+          .map(withTarget)
+          .sort((a, b) => Number(b.crossedTarget) - Number(a.crossedTarget)),
       },
     ];
   });
@@ -80,12 +100,12 @@ export function percentText(percent: number | null): string {
   return `${percent > 0 ? "+" : "−"}${Math.abs(percent).toLocaleString("ko-KR")}%`;
 }
 
-/** "22.9% → 24.1%". 가격이 0원인 메뉴는 원가로 */
-export function impactText(i: MenuCostImpact): string {
+/** "원가율 22.9% → 24.1%", 목표를 넘으면 "원가율 29.5% → 31.2% (목표 30% 넘음)". 가격이 0원인 메뉴는 원가로 */
+export function impactText(i: CostAlertImpact): string {
   if (i.rateBefore === null || i.rateAfter === null) {
     return `원가 ${i.costBefore.toLocaleString("ko-KR")}원 → ${i.costAfter.toLocaleString("ko-KR")}원`;
   }
-  return `원가율 ${i.rateBefore}% → ${i.rateAfter}%`;
+  return `원가율 ${i.rateBefore}% → ${i.rateAfter}%${i.overTarget ? ` (목표 ${i.target}% 넘음)` : ""}`;
 }
 
 /**

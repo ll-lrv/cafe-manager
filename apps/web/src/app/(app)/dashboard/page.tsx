@@ -17,6 +17,8 @@ import { requireCurrentStore } from "@/lib/api/stores";
 import { requireUser } from "@/lib/api/session";
 import { buildCostAlerts } from "@/lib/cost-alerts";
 import { buildItemLevels, storeDayRange, storeToday, toLotView } from "@/lib/inventory";
+import { overTargetMenus } from "../menus/menu-cost";
+import { OverTargetList } from "../menus/over-target-list";
 import { dayLabel } from "../orders/status";
 import { MovementList } from "../stock/movement-list";
 import { applyTemplateAction } from "./actions";
@@ -61,7 +63,9 @@ export default async function DashboardPage() {
 
   const activeItems = items.filter((i) => !i.archivedAt);
   // 최근 바뀐 입고 단가 (알림 기준 이상). 메뉴 원가율이 어떻게 바뀌었는지 함께 보여준다.
-  const costAlerts = costData ? buildCostAlerts(costData[0], items, costData[1], costData[2]) : [];
+  // 지금 가격으로 목표 원가율을 넘는 메뉴 (단가가 올라 마진이 줄었거나 가격이 낮게 잡힌 메뉴)
+  const overTarget = costData ? overTargetMenus(costData[1], costData[2], store.targetCostRate) : [];
+  const costAlerts = costData ? buildCostAlerts(costData[0], items, costData[1], costData[2], { storeTargetRate: store.targetCostRate }) : [];
   const itemById = new Map(activeItems.map((i) => [i.id, i]));
   const levels = buildItemLevels(activeItems, stock, lotLevels, today);
   const fmt = (itemId: string, n: number) => {
@@ -220,6 +224,26 @@ export default async function DashboardPage() {
                 <CostAlertList alerts={costAlerts.slice(0, LIMIT)} timeZone={store.timeZone} />
                 {costAlerts.length > LIMIT && (
                   <p className="pt-2 text-sm text-muted-foreground">외 {costAlerts.length - LIMIT}건</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {overTarget.length > 0 && (
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>목표 원가율을 넘은 메뉴 {overTarget.length}개</CardTitle>
+                <CardDescription>지금 가격 기준 · 목표를 맞추려면 오른쪽 가격 이상으로 팔아야 합니다</CardDescription>
+                <CardAction>
+                  <Link href="/reports/menus" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    메뉴 수익성
+                  </Link>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <OverTargetList items={overTarget.slice(0, LIMIT)} />
+                {overTarget.length > LIMIT && (
+                  <p className="pt-2 text-sm text-muted-foreground">외 {overTarget.length - LIMIT}개</p>
                 )}
               </CardContent>
             </Card>

@@ -32,12 +32,20 @@ function number(formData: FormData, name: string): number {
 }
 
 function readMenuInput(formData: FormData): MenuInput {
-  return { name: text(formData, "name"), price: number(formData, "price") };
+  const target = text(formData, "targetCostRate");
+  return {
+    name: text(formData, "name"),
+    price: number(formData, "price"),
+    // 비우면 매장 기본값
+    targetCostRate: target === "" ? null : number(formData, "targetCostRate"),
+  };
 }
 
 function revalidateMenus(menuId?: string) {
   revalidatePath("/menus");
   revalidatePath("/sales");
+  revalidatePath("/reports/menus");
+  revalidatePath("/dashboard");
   if (menuId) revalidatePath(`/menus/${menuId}`);
 }
 

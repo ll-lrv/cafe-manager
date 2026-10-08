@@ -20,7 +20,7 @@ export default async function NewMenuPage() {
       </div>
       <Card>
         <CardContent>
-          <MenuForm />
+          <MenuForm storeTargetRate={store.targetCostRate} />
         </CardContent>
       </Card>
     </div>

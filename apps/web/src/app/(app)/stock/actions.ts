@@ -64,7 +64,7 @@ export async function recordMovementAction(_prev: ActionState, formData: FormDat
 
     revalidatePath("/stock");
     revalidatePath("/items", "layout");
-    const notice = watchCost ? await costNoticeAfterReceive(store.storeId, [itemId], costsBefore) : undefined;
+    const notice = watchCost ? await costNoticeAfterReceive(store, [itemId], costsBefore) : undefined;
     return { ok: true, message: DONE_MESSAGE[type], notice };
   } catch (e) {
     return toActionError(e);

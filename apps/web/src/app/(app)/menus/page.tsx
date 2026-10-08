@@ -42,7 +42,7 @@ export default async function MenusPage({ searchParams }: PageProps<"/menus">) {
       ) : (
         <ul className="divide-y rounded-xl ring-1 ring-foreground/10">
           {visible.map((menu) => {
-            const { cost, rate, missing } = menuCost(menu, costs);
+            const { cost, rate, missing, overTarget, target } = menuCost(menu, costs, store.targetCostRate);
             return (
               <li key={menu.id}>
                 <Link
@@ -57,6 +57,7 @@ export default async function MenusPage({ searchParams }: PageProps<"/menus">) {
                       <span className="font-medium">{menu.name}</span>
                       {menu.archivedAt && <Badge variant="outline">보관됨</Badge>}
                       {menu.recipe.length === 0 && <Badge variant="destructive">레시피 없음</Badge>}
+                      {overTarget && <Badge variant="destructive">목표 {target}% 초과</Badge>}
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
                       {menu.recipe.map((r) => `${r.itemName} ${formatQuantity(r.quantity, r.baseUnit)}`).join(" · ")}

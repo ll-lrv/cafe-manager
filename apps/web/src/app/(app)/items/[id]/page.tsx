@@ -43,7 +43,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
   const latestCost = costData?.[2][item.id];
   // 가장 최근 단가 변동 (알림 기준보다 작아도 보여준다)
   const costChange = costData
-    ? buildCostAlerts(costData[0], [item], costData[1], costData[2], { notableOnly: false })[0]
+    ? buildCostAlerts(costData[0], [item], costData[1], costData[2], { storeTargetRate: store.targetCostRate, notableOnly: false })[0]
     : undefined;
   const dayFormat = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", timeZone: store.timeZone });
   const quantity = stock[item.id] ?? 0;

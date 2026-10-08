@@ -1,5 +1,5 @@
 import "server-only";
-import { isValidTimeZone, type MemberRole } from "@cafe/core";
+import { isValidTargetRate, isValidTimeZone, type MemberRole } from "@cafe/core";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -14,6 +14,8 @@ export interface StoreMembership {
   storeName: string;
   /** 매장 시간대 (IANA). "오늘"과 하루의 경계, 화면의 날짜·시각 표시에 쓴다. */
   timeZone: string;
+  /** 메뉴 목표 원가율(%) 기본값. 메뉴에 따로 정하지 않으면 이 값 */
+  targetCostRate: number;
   role: MemberRole;
 }
 
@@ -22,13 +24,21 @@ export const getMyStores = cache(async (): Promise<StoreMembership[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("store_members")
-    .select("role, store:stores(id, name, timezone)")
+    .select("role, store:stores(id, name, timezone, target_cost_rate)")
     .eq("user_id", user.id)
     .order("created_at");
   if (error) throw new ApiError(dbErrorMessage(error));
 
   return data.flatMap((m) =>
-    m.store ? [{ storeId: m.store.id, storeName: m.store.name, timeZone: m.store.timezone, role: m.role }] : [],
+    m.store
+      ? [{
+          storeId: m.store.id,
+          storeName: m.store.name,
+          timeZone: m.store.timezone,
+          targetCostRate: m.store.target_cost_rate,
+          role: m.role,
+        }]
+      : [],
   );
 });
 
@@ -66,17 +76,18 @@ export async function createStore(name: string): Promise<string> {
   return data;
 }
 
-/** 매장 이름·시간대 수정 (사장만. RLS와 컬럼 권한, DB 트리거가 최종 확인) */
-export async function updateStore(storeId: string, input: { name: string; timeZone: string }) {
+/** 매장 이름·시간대·목표 원가율 수정 (사장만. RLS와 컬럼 권한, DB 트리거·제약이 최종 확인) */
+export async function updateStore(storeId: string, input: { name: string; timeZone: string; targetCostRate: number }) {
   const name = input.name.trim();
   if (!name) throw new ApiError("매장 이름을 입력해 주세요.");
   if (name.length > 50) throw new ApiError("매장 이름은 50자 이하로 입력해 주세요.");
   if (!isValidTimeZone(input.timeZone)) throw new ApiError("지원하지 않는 시간대입니다.");
+  if (!isValidTargetRate(input.targetCostRate)) throw new ApiError("목표 원가율은 1~100 사이의 정수(%)로 입력해 주세요.");
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("stores")
-    .update({ name, timezone: input.timeZone })
+    .update({ name, timezone: input.timeZone, target_cost_rate: input.targetCostRate })
     .eq("id", storeId)
     .select("id");
   if (error) throw new ApiError(dbErrorMessage(error));

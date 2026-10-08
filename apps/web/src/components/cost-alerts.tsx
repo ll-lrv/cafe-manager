@@ -2,6 +2,7 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { impactText, percentText, priceChangeText, type CostAlert } from "@/lib/cost-alerts";
+import { cn } from "@/lib/utils";
 
 /** "10월 3일" (매장 시간대) */
 const dayFormat = (timeZone: string) => new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", timeZone });
@@ -31,7 +32,7 @@ export function CostImpactList({ alert, limit }: { alert: CostAlert; limit?: num
           <Link href={`/menus/${i.menuId}`} className="font-medium text-foreground hover:underline">
             {i.menuName}
           </Link>
-          <span className="tabular-nums">{impactText(i)}</span>
+          <span className={cn("tabular-nums", i.overTarget && "text-destructive")}>{impactText(i)}</span>
         </li>
       ))}
       {rest > 0 && <li>외 메뉴 {rest}개</li>}

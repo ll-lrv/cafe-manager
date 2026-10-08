@@ -1,14 +1,20 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, id } from "./_shared";
 import { memberRole } from "./enums";
 
-export const stores = pgTable("stores", {
-  id: id(),
-  name: text("name").notNull(),
-  timezone: text("timezone").notNull().default("Asia/Seoul"),
-  createdAt: createdAt(),
-});
+export const stores = pgTable(
+  "stores",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    timezone: text("timezone").notNull().default("Asia/Seoul"),
+    /** 메뉴 목표 원가율(%) 기본값. 메뉴마다 따로 정할 수 있다 (menus.target_cost_rate) */
+    targetCostRate: integer("target_cost_rate").notNull().default(30),
+    createdAt: createdAt(),
+  },
+  (t) => [check("stores_target_cost_rate_check", sql`${t.targetCostRate} BETWEEN 1 AND 100`)],
+);
 
 /**
  * 로그인 사용자 프로필. id 는 Supabase auth.users.id 와 같다.

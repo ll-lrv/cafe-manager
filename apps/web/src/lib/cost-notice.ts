@@ -1,6 +1,7 @@
 import "server-only";
 import { listItems } from "@/lib/api/catalog";
 import { getLatestCosts, listMenus } from "@/lib/api/menus";
+import type { StoreMembership } from "@/lib/api/stores";
 import { buildCostAlerts, costAlertNotice } from "@/lib/cost-alerts";
 
 /**
@@ -9,7 +10,7 @@ import { buildCostAlerts, costAlertNotice } from "@/lib/cost-alerts";
  * 입고는 이미 끝났으므로 여기서 생긴 오류는 알림만 건너뛴다.
  */
 export async function costNoticeAfterReceive(
-  storeId: string,
+  { storeId, targetCostRate }: Pick<StoreMembership, "storeId" | "targetCostRate">,
   itemIds: string[],
   before: Record<string, number>,
 ): Promise<string | undefined> {
@@ -24,7 +25,7 @@ export async function costNoticeAfterReceive(
     });
     if (changes.length === 0) return undefined;
     const [items, menus, costs] = await Promise.all([listItems(storeId), listMenus(storeId), getLatestCosts(storeId)]);
-    return costAlertNotice(buildCostAlerts(changes, items, menus, costs));
+    return costAlertNotice(buildCostAlerts(changes, items, menus, costs, { storeTargetRate: targetCostRate }));
   } catch (e) {
     console.error(e);
     return undefined;

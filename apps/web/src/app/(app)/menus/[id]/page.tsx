@@ -9,6 +9,7 @@ import { listCategories, listItems } from "@/lib/api/catalog";
 import { getLatestCosts, getMenu } from "@/lib/api/menus";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { activeItemsInCategoryOrder } from "@/lib/inventory";
+import { cn } from "@/lib/utils";
 import { BackLink } from "../back-link";
 import { menuCost, won } from "../menu-cost";
 import { ArchiveMenuButton, MenuForm, RecipeEditor } from "../menu-forms";
@@ -25,7 +26,7 @@ export default async function MenuPage({ params, searchParams }: PageProps<"/men
     getLatestCosts(store.storeId),
   ]);
   const readOnly = !can(store.role, "catalog:manage");
-  const { cost, rate, missing } = menuCost(menu, costs);
+  const { cost, rate, missing, target, overTarget, suggestedPrice } = menuCost(menu, costs, store.targetCostRate);
   const hasRecipe = menu.recipe.length > 0;
 
   return (
@@ -53,16 +54,33 @@ export default async function MenuPage({ params, searchParams }: PageProps<"/men
         </Alert>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: "가격", value: won(menu.price) },
           { label: "원가", value: hasRecipe ? won(cost) : "—" },
-          { label: "원가율", value: hasRecipe && rate !== null ? `${rate}%` : "—" },
+          {
+            label: "원가율",
+            value: hasRecipe && rate !== null ? `${rate}%` : "—",
+            sub: `목표 ${target}%${menu.targetCostRate === null ? " (매장 기본)" : ""}`,
+            bad: overTarget,
+          },
+          {
+            label: "목표 맞추는 판매가",
+            value: hasRecipe && suggestedPrice !== null ? won(suggestedPrice) : "—",
+            sub:
+              suggestedPrice === null
+                ? "원가를 알면 계산합니다"
+                : overTarget
+                  ? `지금보다 +${won(suggestedPrice - menu.price)}`
+                  : "이 가격 이상이면 목표 안",
+            bad: overTarget,
+          },
         ].map((s) => (
           <Card key={s.label} size="sm">
             <CardHeader>
               <CardDescription>{s.label}</CardDescription>
-              <CardTitle className="text-lg font-bold tabular-nums">{s.value}</CardTitle>
+              <CardTitle className={cn("text-lg font-bold tabular-nums", s.bad && "text-destructive")}>{s.value}</CardTitle>
+              {s.sub && <p className={cn("text-xs text-muted-foreground", s.bad && "text-destructive")}>{s.sub}</p>}
             </CardHeader>
           </Card>
         ))}
@@ -93,7 +111,7 @@ export default async function MenuPage({ params, searchParams }: PageProps<"/men
           {readOnly && <CardDescription>메뉴는 사장과 매니저만 바꿀 수 있습니다.</CardDescription>}
         </CardHeader>
         <CardContent>
-          <MenuForm menu={menu} readOnly={readOnly} />
+          <MenuForm menu={menu} storeTargetRate={store.targetCostRate} readOnly={readOnly} />
         </CardContent>
       </Card>
     </div>

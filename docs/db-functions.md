@@ -279,6 +279,20 @@ PostgREST 에서 집계(sum·group by)를 쓸 수 없어 함수로 둔 것이고
 (차이가 0 이라 조정 원장이 없어도 true. false 면 실사 차이를 모른다).
 실사 구간 리포트는 (앞 실사 완료 시각, 이번 실사 완료 시각] 으로 자른다. 실사 조정 원장이 완료 시각(`now()`)에 기록되기 때문.
 
+### `menu_sales_summary` — 기간별 메뉴 판매 합계 (읽기 전용, 리포트)
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261008135616_menu_profit.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/reports.ts` `getMenuSales()` → `/reports`(매출), `/reports/menus`(메뉴 수익성) |
+| NestJS 대응 | `ReportsService.menuSales()` (예정). 같은 집계 SQL 을 그대로 쓰면 된다 |
+| 권한 | `SECURITY INVOKER` (RLS 그대로). 화면은 `report:view`(사장·매니저)만 |
+| core 대응 | `menuProfitLines` (`menu-profit.ts`, 마진·분류 계산은 모두 여기) |
+
+입력 `p_from` 이상 `p_to` 미만(`sold_at`). 메뉴별 판매량·금액 합계 (취소·반품 음수 판매는 상계, 금액 없는 판매는 0원).
+판매를 한 줄씩 읽으면 API 최대 행 수(`max_rows = 1000`)에 걸려 큰 기간의 합계가 틀어지므로 DB 에서 더한다.
+같은 마이그레이션에서 `stores.target_cost_rate`(매장 목표 원가율) 컬럼 수정 권한을 준다 (사장만, RLS `stores_update`).
+
 ### 권한 확인 함수 — `has_store_role`, `is_store_member`, `is_store_admin`
 
 RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()` 이 대신한다. RLS를 끌 때 함께 지운다.

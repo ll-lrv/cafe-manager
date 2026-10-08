@@ -1,5 +1,5 @@
 import "server-only";
-import { roundQty, toBaseQuantity, type BaseUnit } from "@cafe/core";
+import { isValidTargetRate, roundQty, toBaseQuantity, type BaseUnit } from "@cafe/core";
 import { createClient } from "@/lib/supabase/server";
 import { ApiError, dbErrorMessage } from "./errors";
 
@@ -17,6 +17,8 @@ export interface Menu {
   name: string;
   /** 원(KRW) */
   price: number;
+  /** 목표 원가율(%). null 이면 매장 기본값 */
+  targetCostRate: number | null;
   archivedAt: string | null;
   recipe: RecipeLine[];
 }
@@ -24,15 +26,18 @@ export interface Menu {
 export interface MenuInput {
   name: string;
   price: number;
+  /** null 이면 매장 기본값을 따른다 */
+  targetCostRate: number | null;
 }
 
 const MENU_SELECT =
-  "id, name, price, archived_at, recipe:recipe_ingredients(item_id, quantity, item:items(name, base_unit, archived_at))";
+  "id, name, price, target_cost_rate, archived_at, recipe:recipe_ingredients(item_id, quantity, item:items(name, base_unit, archived_at))";
 
 type MenuRow = {
   id: string;
   name: string;
   price: number;
+  target_cost_rate: number | null;
   archived_at: string | null;
   recipe: {
     item_id: string;
@@ -46,6 +51,7 @@ function toMenu(row: MenuRow): Menu {
     id: row.id,
     name: row.name,
     price: row.price,
+    targetCostRate: row.target_cost_rate,
     archivedAt: row.archived_at,
     recipe: row.recipe
       .map((r) => ({
@@ -73,7 +79,10 @@ function validateMenuInput(input: MenuInput) {
   if (!Number.isInteger(input.price) || input.price < 0 || input.price > 10_000_000) {
     throw new ApiError("가격은 0 이상의 원 단위 숫자로 입력해 주세요.");
   }
-  return { name, price: input.price };
+  if (input.targetCostRate !== null && !isValidTargetRate(input.targetCostRate)) {
+    throw new ApiError("목표 원가율은 1~100 사이의 정수(%)로 입력해 주세요. 비워 두면 매장 기본값을 씁니다.");
+  }
+  return { name, price: input.price, target_cost_rate: input.targetCostRate };
 }
 
 // ---------------------------------------------------------------- 메뉴

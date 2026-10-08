@@ -13,8 +13,9 @@ export async function updateStoreAction(_prev: ActionState, formData: FormData):
     await updateStore(store.storeId, {
       name: String(formData.get("name") ?? ""),
       timeZone: String(formData.get("timeZone") ?? ""),
+      targetCostRate: Number(String(formData.get("targetCostRate") ?? "").trim() || NaN),
     });
-    // 머리글의 매장 이름과 모든 화면의 날짜가 바뀐다.
+    // 머리글의 매장 이름과 모든 화면의 날짜, 메뉴 원가율 비교 기준이 바뀐다.
     revalidatePath("/", "layout");
     return { ok: true, message: "매장 정보를 저장했습니다." };
   } catch (e) {

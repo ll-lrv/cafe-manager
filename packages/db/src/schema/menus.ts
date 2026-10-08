@@ -24,6 +24,8 @@ export const menus = pgTable(
     name: text("name").notNull(),
     /** 원(KRW) */
     price: integer("price").notNull().default(0),
+    /** 목표 원가율(%). null 이면 매장 기본값 (stores.target_cost_rate) */
+    targetCostRate: integer("target_cost_rate"),
     isActive: boolean("is_active").notNull().default(true),
     /** POS 등 외부 시스템의 메뉴 ID (연동 단계에서 사용) */
     externalId: text("external_id"),
@@ -34,6 +36,7 @@ export const menus = pgTable(
   (t) => [
     uniqueIndex("menus_store_name_key").on(t.storeId, t.name),
     check("menus_price_check", sql`${t.price} >= 0`),
+    check("menus_target_cost_rate_check", sql`${t.targetCostRate} BETWEEN 1 AND 100`),
   ],
 );
 

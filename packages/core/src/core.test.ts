@@ -16,6 +16,10 @@ import {
   summarizeNames,
   isNotableCostChange,
   menuCostImpacts,
+  effectiveTargetRate,
+  isOverTarget,
+  menuProfitLines,
+  suggestedPrice,
   dateInTimeZone,
   daysUntilExpiry,
   expiryLabel,
@@ -451,5 +455,54 @@ describe("sales import", () => {
         "옛 메뉴": "archived",
       }),
     ).toEqual({ 아이스아메리카노: "m1", "라떼(L)": "m2", 쿠폰: null, 카페라떼: "m2", "옛 메뉴": undefined });
+  });
+});
+
+describe("menu profit", () => {
+  it("목표 원가율 → 권장 판매가 (100원 단위로 올림)", () => {
+    expect(suggestedPrice(1350, 30)).toBe(4500);
+    expect(suggestedPrice(1360, 30)).toBe(4600);
+    expect(suggestedPrice(900, 25)).toBe(3600);
+    expect(suggestedPrice(0, 30)).toBeNull();
+    expect(effectiveTargetRate(null, 30)).toBe(30);
+    expect(effectiveTargetRate(25, 30)).toBe(25);
+    expect(isOverTarget(30.1, 30)).toBe(true);
+    expect(isOverTarget(30, 30)).toBe(false);
+    expect(isOverTarget(null, 30)).toBe(false);
+  });
+
+  it("메뉴별 마진 순위와 분류 (판매량 × 개당 마진)", () => {
+    const menu = (menuId: string, unitCost: number) => ({ menuId, unitCost, costIncomplete: false, noRecipe: false });
+    const { lines, summary } = menuProfitLines(
+      [menu("아메", 500), menu("라떼", 1500), menu("바닐라", 1800), menu("시즌", 1000), menu("옛메뉴", 500), menu("취소만", 500)],
+      [
+        { menuId: "바닐라", quantity: 10, amount: 55000 },
+        { menuId: "아메", quantity: 100, amount: 400000 },
+        { menuId: "라떼", quantity: 60, amount: 270000 },
+        { menuId: "시즌", quantity: 5, amount: 15000 },
+        { menuId: "옛메뉴", quantity: -1, amount: -4000 }, // 지난 기간 판매의 반품
+        { menuId: "취소만", quantity: 0, amount: 0 }, // 판매 + 취소로 0
+        { menuId: "없는메뉴", quantity: 3, amount: 9000 },
+      ],
+    );
+    expect(lines.map((l) => [l.menuId, l.margin, l.unitMargin, l.class])).toEqual([
+      ["아메", 350000, 3500, "star"],
+      ["라떼", 180000, 3000, "plowhorse"], // 많이 팔리지만 개당 남는 게 평균보다 적다
+      ["바닐라", 37000, 3700, "puzzle"],
+      ["시즌", 10000, 2000, "dog"],
+      ["옛메뉴", -3500, null, null],
+    ]);
+    expect(lines[1]).toMatchObject({ cost: 90000, costRate: 33.3, averagePrice: 4500 });
+    expect(summary).toEqual({
+      revenue: 736000,
+      cost: 162500,
+      margin: 573500,
+      quantity: 174,
+      costRate: 22.1,
+      popularityThreshold: (175 / 4) * 0.7,
+      unitMarginThreshold: 3297, // 577,000 ÷ 175 (반품만 있는 메뉴는 기준에서 뺀다)
+    });
+    // 판매가 있는 메뉴가 하나뿐이면 분류하지 않는다
+    expect(menuProfitLines([menu("아메", 500)], [{ menuId: "아메", quantity: 3, amount: 12000 }]).lines[0]!.class).toBeNull();
   });
 });

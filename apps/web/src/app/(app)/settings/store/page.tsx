@@ -40,7 +40,12 @@ export default async function StoreSettingsPage() {
           <CardDescription>시간대를 바꿔도 이미 기록된 시각은 그대로이고, 보여주는 기준만 바뀝니다.</CardDescription>
         </CardHeader>
         <CardContent>
-          <StoreForm name={store.storeName} timeZone={store.timeZone} timeZoneOptions={timeZoneOptions(store.timeZone)} />
+          <StoreForm
+            name={store.storeName}
+            timeZone={store.timeZone}
+            targetCostRate={store.targetCostRate}
+            timeZoneOptions={timeZoneOptions(store.timeZone)}
+          />
         </CardContent>
       </Card>
     </div>

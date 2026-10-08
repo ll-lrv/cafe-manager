@@ -12,6 +12,7 @@ import {
   useFormAction,
   useToastResult,
 } from "@/components/form-parts";
+import { PercentInput } from "@/components/percent-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,12 @@ function WonInput(props: React.ComponentProps<typeof Input>) {
 
 // ---------------------------------------------------------------- 메뉴 정보
 
-export function MenuForm({ menu, readOnly = false }: { menu?: Menu; readOnly?: boolean }) {
+export function MenuForm({ menu, storeTargetRate, readOnly = false }: {
+  menu?: Menu;
+  /** 매장 기본 목표 원가율(%) */
+  storeTargetRate: number;
+  readOnly?: boolean;
+}) {
   const { state, pending, formProps } = useFormAction(menu ? updateMenuAction : createMenuAction);
   useToastResult(menu ? state : undefined);
 
@@ -49,15 +55,23 @@ export function MenuForm({ menu, readOnly = false }: { menu?: Menu; readOnly?: b
       {menu && <input type="hidden" name="menuId" value={menu.id} />}
       {/* 저장된 값이 바뀌면 입력칸을 새로 그려 저장된 값을 보여준다. 폼의 액션 결과는 유지된다. */}
       <fieldset
-        key={menu && `${menu.name}:${menu.price}`}
+        key={menu && `${menu.name}:${menu.price}:${menu.targetCostRate}`}
         disabled={readOnly}
-        className="grid gap-4 sm:grid-cols-[1fr_12rem]"
+        className="grid gap-4 sm:grid-cols-[1fr_10rem_10rem]"
       >
         <Field label="메뉴 이름" htmlFor="menu-name">
           <Input id="menu-name" name="name" defaultValue={menu?.name} placeholder="예) 아메리카노" maxLength={50} required />
         </Field>
         <Field label="가격" htmlFor="menu-price">
           <WonInput id="menu-price" name="price" defaultValue={menu?.price ?? ""} placeholder="4500" required />
+        </Field>
+        <Field label="목표 원가율" htmlFor="menu-target-cost-rate" hint={`비우면 매장 기본 ${storeTargetRate}%`}>
+          <PercentInput
+            id="menu-target-cost-rate"
+            name="targetCostRate"
+            defaultValue={menu?.targetCostRate ?? ""}
+            placeholder={String(storeTargetRate)}
+          />
         </Field>
       </fieldset>
       {!readOnly && (

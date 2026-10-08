@@ -149,14 +149,14 @@ isOneToOne: false
                   ]
                 },"menus": {
                   Row: {
-                    "archived_at": string | null,"created_at": string,"external_id": string | null,"id": string,"is_active": boolean,"name": string,"price": number,"store_id": string,"updated_at": string
+                    "archived_at": string | null,"created_at": string,"external_id": string | null,"id": string,"is_active": boolean,"name": string,"price": number,"store_id": string,"target_cost_rate": number | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "archived_at"?: string | null,"created_at"?: string,"external_id"?: string | null,"id"?: string,"is_active"?: boolean,"name": string,"price"?: number,"store_id": string,"updated_at"?: string
+                    "archived_at"?: string | null,"created_at"?: string,"external_id"?: string | null,"id"?: string,"is_active"?: boolean,"name": string,"price"?: number,"store_id": string,"target_cost_rate"?: number | null,"updated_at"?: string
                   }
                   Update: {
-                    "archived_at"?: string | null,"created_at"?: string,"external_id"?: string | null,"id"?: string,"is_active"?: boolean,"name"?: string,"price"?: number,"store_id"?: string,"updated_at"?: string
+                    "archived_at"?: string | null,"created_at"?: string,"external_id"?: string | null,"id"?: string,"is_active"?: boolean,"name"?: string,"price"?: number,"store_id"?: string,"target_cost_rate"?: number | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -595,14 +595,14 @@ isOneToOne: false
                   ]
                 },"stores": {
                   Row: {
-                    "created_at": string,"id": string,"name": string,"timezone": string
+                    "created_at": string,"id": string,"name": string,"target_cost_rate": number,"timezone": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"name": string,"timezone"?: string
+                    "created_at"?: string,"id"?: string,"name": string,"target_cost_rate"?: number,"timezone"?: string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"name"?: string,"timezone"?: string
+                    "created_at"?: string,"id"?: string,"name"?: string,"target_cost_rate"?: number,"timezone"?: string
                   }
                   Relationships: [
                     
@@ -796,6 +796,11 @@ isOneToOne: false
                            },
 "is_store_member":
 { Args: { "p_store_id": string }; Returns: boolean
+                           },
+"menu_sales_summary":
+{ Args: { "p_from": string,"p_store_id": string,"p_to": string }; Returns: {
+              "amount": number,"menu_id": string,"quantity": number
+            }[]
                            },
 "receive_purchase_order":
 { Args: { "p_lines": Json,"p_order_id": string }; Returns: Database["public"]['Enums']["purchase_order_status"]

@@ -176,6 +176,20 @@
       "when": 1791440723684,
       "tag": "20261008062523_import_sales_refunds",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791467774916,
+      "tag": "20261008135614_target_cost_rate",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791467776578,
+      "tag": "20261008135616_menu_profit",
+      "breakpoints": true
     }
   ]
 }
