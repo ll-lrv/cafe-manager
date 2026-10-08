@@ -183,13 +183,17 @@ function CancelSaleButton({ sale }: { sale: Sale }) {
     <ActionButton
       action={cancelSaleAction}
       fields={{ saleId: sale.id }}
-      confirmMessage={`${sale.menuName} ${sale.quantity}개 판매를 취소할까요? 차감된 재료도 되돌아갑니다.`}
+      confirmMessage={
+        sale.quantity < 0
+          ? `${sale.menuName} ${-sale.quantity}개 취소 기록을 지울까요? 되돌렸던 재료가 다시 차감되고 매출에 다시 들어갑니다.`
+          : `${sale.menuName} ${sale.quantity}개 판매를 취소할까요? 차감된 재료도 되돌아갑니다.`
+      }
       variant="ghost"
       size="sm"
       pendingText="취소 중…"
-      aria-label={`${sale.menuName} 판매 취소`}
+      aria-label={sale.quantity < 0 ? `${sale.menuName} 취소 기록 지우기` : `${sale.menuName} 판매 취소`}
     >
-      취소
+      {sale.quantity < 0 ? "지우기" : "취소"}
     </ActionButton>
   );
 }
@@ -205,6 +209,7 @@ export function SaleList({ sales, canCancel, timeZone }: { sales: Sale[]; canCan
           <span className="text-sm font-medium">{sale.menuName}</span>
           <span className="text-sm tabular-nums">{sale.quantity.toLocaleString("ko-KR")}개</span>
           <span className="text-sm text-muted-foreground tabular-nums">{won(sale.amount)}</span>
+          {sale.quantity < 0 && <Badge variant="destructive">취소</Badge>}
           {sale.source === "csv" && <Badge variant="outline">CSV</Badge>}
           <span className="w-full text-xs text-muted-foreground sm:w-auto">
             {timeFormat(timeZone).format(new Date(sale.soldAt))}

@@ -1,7 +1,19 @@
 import type { Page } from "@playwright/test";
 import { sql } from "../db";
 import { expect, MOBILE, test } from "../fixtures";
-import { addIngredient, check, createItem, createMenu, hasHorizontalScroll, kstDate, main, recordStock, shot } from "../helpers";
+import {
+  addIngredient,
+  check,
+  createItem,
+  createMenu,
+  disappearsLive,
+  hasHorizontalScroll,
+  kstDate,
+  main,
+  recordStock,
+  shot,
+  waitForRealtime,
+} from "../helpers";
 
 const stockOf = (itemId: string) =>
   Number(sql(`select coalesce((select quantity from item_stock_levels where item_id = '${itemId}'), 0)`));
@@ -52,43 +64,48 @@ test("CSV 판매 가져오기", async ({ app }) => {
     check("금액 = 실판매금액 (상품가격 아님)", (await selected("col-amount")) === "실판매금액");
     check("주문번호", (await selected("col-orderNo")) === "주문번호");
     const text = await main(p);
-    check("4줄 읽음, 2줄 안 읽음 (취소·합계)", text.includes("판매 4줄을 읽었습니다. 읽지 않은 줄 2개."), text);
+    check("5줄 읽음 (취소 줄 포함), 합계 줄만 안 읽음", text.includes("판매 5줄을 읽었습니다. 읽지 않은 줄 1개."), text);
+    check("취소 줄 안내", text.includes("취소·반품 1줄은 매출에서 빼고 재료를 되돌립니다."), text);
     await p.getByText("읽지 않은 줄 보기").click();
-    const issues = await main(p);
-    check("취소·합계 줄 안내", issues.includes("7번째 줄: 수량이 0 이하 (취소·반품)") && issues.includes("8번째 줄: 합계 줄"), issues);
+    check("합계 줄", (await main(p)).includes("8번째 줄: 합계 줄"));
   });
 
   await test.step("2. 메뉴 맞추기", async () => {
     const rowOf = (name: string) => p.locator("main li").filter({ has: p.getByLabel(`${name} 메뉴`) });
-    check("같은 이름은 자동", (await rowOf("아메리카노").innerText()).includes("자동으로 맞춤"));
+    const americano = await rowOf("아메리카노").innerText();
+    check("같은 이름은 자동, 취소 줄 수", americano.includes("자동으로 맞춤") && americano.includes("2줄 · 1개 · 취소 1줄"), americano);
     check("옵션이 붙은 이름은 직접", (await p.getByLabel("카페 라떼 / ICE 메뉴").inputValue()) === "");
     check("못 맞춘 이름이 있으면 가져오기 막힘", await p.getByRole("button", { name: /가져오기$/ }).isDisabled());
     await p.getByLabel("카페 라떼 / ICE 메뉴").selectOption({ label: "카페라떼" });
     await p.getByLabel("쿠폰 메뉴").selectOption({ label: "가져오지 않음" });
-    // 아메리카노 2잔 9,000 + 라떼 4,500(할인) + 라떼 5,000
-    await expect(p.locator("main")).toContainText("판매 3줄 · 4개 · 18,500원");
+    // 아메리카노 2잔 9,000 + 라떼 4,500(할인) + 라떼 5,000 − 아메리카노 취소 4,500
+    await expect(p.locator("main")).toContainText("4줄 (취소 1줄) · 3개 · 14,000원");
     await shot(p, "가져오기 메뉴 맞추기");
   });
 
   await test.step("3. 가져오기 → 재료 차감, 판매 화면", async () => {
-    await p.getByRole("button", { name: "판매 3줄 가져오기" }).click();
-    await toast(p, "판매 3건을 가져왔습니다.").waitFor();
-    check("원두 1000 − 18×4 = 928g", stockOf(beans) === 928, stockOf(beans));
+    await p.getByRole("button", { name: "4줄 가져오기" }).click();
+    await toast(p, "4건을 가져왔습니다.").waitFor();
+    check("원두 1000 − 18×4 + 18(취소) = 946g", stockOf(beans) === 946, stockOf(beans));
     check("우유 1000 − 200×2 = 600ml", stockOf(milk) === 600, stockOf(milk));
-    await expect(p.locator("main")).toContainText("3건 · 4개 · 18,500원");
+    await expect(p.locator("main")).toContainText("4건 · 3개 · 14,000원");
     await p.goto(`/sales?date=${d1}`);
     const text = await main(p);
     check("그 날 매출 13,500원, CSV 표시", text.includes("13,500원") && text.includes("CSV"), text);
     check("시각 09:10", text.includes("09:10"), text);
+    await p.goto(`/sales?date=${d2}`);
+    const day2 = await main(p);
+    // 라떼 5,000 − 아메리카노 취소 4,500
+    check("취소 줄: 매출 500원, 취소 표시, 판매 0개", day2.includes("500원") && day2.includes("취소") && day2.includes("0개 판매"), day2);
   });
 
   await test.step("4. 같은 파일 다시: 매칭 기억, 중복 없음", async () => {
     await upload(p, "토스매출.csv", csv);
     check("저장한 매칭으로 자동", (await p.getByLabel("카페 라떼 / ICE 메뉴").locator("option:checked").innerText()) === "카페라떼");
     check("가져오지 않음도 기억", (await p.getByLabel("쿠폰 메뉴").locator("option:checked").innerText()) === "가져오지 않음");
-    await p.getByRole("button", { name: "판매 3줄 가져오기" }).click();
+    await p.getByRole("button", { name: "4줄 가져오기" }).click();
     await toast(p, "이 파일의 판매는 모두 이미 가져왔습니다.").waitFor();
-    check("재고 그대로", stockOf(beans) === 928, stockOf(beans));
+    check("재고 그대로", stockOf(beans) === 946, stockOf(beans));
     await expect(p.locator("main li").filter({ hasText: "토스매출.csv" })).toHaveCount(1);
   });
 
@@ -97,21 +114,56 @@ test("CSV 판매 가져오기", async ({ app }) => {
     await upload(p, "추가.csv", more);
     check("미래 날짜는 빼고", (await main(p)).includes("미래 날짜 1줄은 빼고 가져옵니다."));
     // 금액 열이 없으면 메뉴 가격 × 수량
-    await expect(p.locator("main")).toContainText("판매 2줄 · 4개 · 18,500원");
-    await p.getByRole("button", { name: "판매 2줄 가져오기" }).click();
-    await toast(p, "판매 2건을 가져왔습니다.").waitFor();
-    check("원두 928 − 18×4 = 856g", stockOf(beans) === 856, stockOf(beans));
+    await expect(p.locator("main")).toContainText("2줄 · 4개 · 18,500원");
+    await p.getByRole("button", { name: "2줄 가져오기" }).click();
+    await toast(p, "2건을 가져왔습니다.").waitFor();
+    check("원두 946 − 18×4 = 874g", stockOf(beans) === 874, stockOf(beans));
   });
 
   await test.step("6. 가져오기 취소 → 판매·재료 되돌림", async () => {
     await p.getByRole("button", { name: "토스매출.csv 가져오기 취소" }).click();
     await toast(p, "가져오기를 취소했습니다.").waitFor();
     await expect(p.locator("main li").filter({ hasText: "토스매출.csv" })).toHaveCount(0);
-    check("원두 856 + 72 = 928g", stockOf(beans) === 928, stockOf(beans));
+    check("원두 874 + 18×3(판매 4잔 − 취소 1잔) = 928g", stockOf(beans) === 928, stockOf(beans));
     check("우유: 추가.csv 의 라떼 1잔만 남음 → 800ml", stockOf(milk) === 800, stockOf(milk));
   });
 
-  await test.step("7. 직원은 가져올 수 없음", async () => {
+  await test.step("7. 가져온 판매 하나 취소 → 다른 기기 반영, 다시 올려도 되살아나지 않음", async () => {
+    const { page: o } = await app.newPage({ sameLoginAs: owner.ctx });
+    await o.goto(`/sales?date=${d2}`);
+    await expect(o.locator("main")).toContainText("13,500원");
+    await waitForRealtime(o);
+    // 남은 것: 추가.csv 의 d2 아메리카노 3잔(13,500원), 오늘 라떼 1잔
+    await p.goto(`/sales?date=${d2}`);
+    await p.getByRole("button", { name: "아메리카노 판매 취소" }).click();
+    await toast(p, "판매를 취소했습니다.").waitFor();
+    check("실시간: 다른 기기에서 사라짐", await disappearsLive(o, "13,500원"));
+    check("원두 928 + 18×3 = 982g", stockOf(beans) === 982, stockOf(beans));
+
+    await upload(p, "추가.csv", ["일자,메뉴,판매수량", `${d2},아메리카노,3`, `${kstDate(0)},카페라떼,1`].join("\n"));
+    await p.getByRole("button", { name: "2줄 가져오기" }).click();
+    await toast(p, "이 파일의 판매는 모두 이미 가져왔습니다.").waitFor();
+    check("취소한 판매는 다시 안 들어옴", stockOf(beans) === 982, stockOf(beans));
+  });
+
+  await test.step("8. 상태가 취소로 바뀐 주문: 예전에 가져온 판매가 상계됨", async () => {
+    const header = "주문번호,결제일시,상품명,수량,실판매금액,결제상태";
+    const line = (status: string) => `B1,${d1} 15:00:00,카페라떼,1,"5,000",${status}`;
+    await upload(p, "어제.csv", [header, line("완료")].join("\n"));
+    check("상태 열 자동 선택", (await p.locator("#col-status option:checked").innerText()).trim() === "결제상태");
+    await p.getByRole("button", { name: "1줄 가져오기" }).click();
+    await toast(p, "1건을 가져왔습니다.").waitFor();
+    check("원두 982 − 18 = 964g", stockOf(beans) === 964, stockOf(beans));
+
+    await upload(p, "오늘.csv", [header, line("결제취소")].join("\n"));
+    await expect(p.locator("main")).toContainText("2줄 (취소 1줄) · 0개 · 0원");
+    await p.getByRole("button", { name: "2줄 가져오기" }).click();
+    // 판매 줄은 이미 가져왔으므로 건너뛰고 취소 줄만 들어간다
+    await toast(p, "1건을 가져왔습니다.").waitFor();
+    check("원두 964 + 18 = 982g", stockOf(beans) === 982, stockOf(beans));
+  });
+
+  await test.step("9. 직원은 가져올 수 없음", async () => {
     const { page: s } = await app.joinByInvite(p);
     await s.goto("/sales");
     check("가져오기 버튼 없음", (await s.getByRole("link", { name: "CSV 가져오기" }).count()) === 0);
@@ -119,7 +171,7 @@ test("CSV 판매 가져오기", async ({ app }) => {
     check("주소로 들어와도 차단", (await main(s)).includes("판매 가져오기는 사장과 매니저만 할 수 있습니다."));
   });
 
-  await test.step("8. 모바일", async () => {
+  await test.step("10. 모바일", async () => {
     const { page: m } = await app.newPage({ viewport: MOBILE, sameLoginAs: owner.ctx });
     await upload(m, "토스매출.csv", csv);
     check("가로 스크롤 없음", !(await hasHorizontalScroll(m)));

@@ -6,6 +6,7 @@ import {
   integer,
   pgTable,
   pgView,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -65,6 +66,7 @@ export const saleRecords = pgTable(
     menuId: uuid("menu_id")
       .notNull()
       .references(() => menus.id, { onDelete: "restrict" }),
+    /** 판매 수량. 음수는 취소·반품 (CSV 가져오기) */
     quantity: integer("quantity").notNull(),
     /** 판매 금액 합계, 원(KRW). POS 연동 시 할인 등이 반영된 실제 금액 */
     amount: integer("amount"),
@@ -83,8 +85,26 @@ export const saleRecords = pgTable(
     uniqueIndex("sale_records_external_key")
       .on(t.storeId, t.source, t.externalId)
       .where(sql`${t.externalId} is not null`),
-    check("sale_records_quantity_check", sql`${t.quantity} > 0`),
+    // 취소·반품(가져온 판매)은 음수: 매출과 재료 차감을 되돌린다.
+    check("sale_records_quantity_check", sql`${t.quantity} <> 0`),
   ],
+);
+
+/**
+ * 하나씩 취소한 가져온 판매의 행 키. 기간이 겹치는 파일을 다시 올려도 취소한 판매가 되살아나지 않게 import_sales 가 건너뛴다.
+ * 판매를 지울 때 트리거가 기록한다 (가져오기 전체 취소는 기록하지 않음: 다시 올릴 수 있게).
+ */
+export const cancelledSaleKeys = pgTable(
+  "cancelled_sale_keys",
+  {
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "cascade" }),
+    source: saleSource("source").notNull(),
+    externalId: text("external_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.storeId, t.source, t.externalId] })],
 );
 
 /** 가져오기마다 지금 남아 있는 판매 합계 (가져오기 기록 화면용) */

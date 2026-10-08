@@ -84,7 +84,8 @@ export const stockMovements = pgTable(
     check(
       "stock_movements_sign_check",
       sql`(${t.type} = 'receive' and ${t.quantity} > 0)
-        or (${t.type} in ('consume', 'sale', 'waste') and ${t.quantity} < 0)
+        or (${t.type} in ('consume', 'waste') and ${t.quantity} < 0)
+        or (${t.type} = 'sale' and ${t.quantity} <> 0)
         or (${t.type} = 'adjust' and ${t.quantity} <> 0)`,
     ),
   ],

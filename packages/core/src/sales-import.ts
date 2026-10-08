@@ -4,7 +4,7 @@
  * 한 행 = 메뉴 하나의 판매 (날짜[·시각], 메뉴 이름, 수량, 금액).
  */
 
-export type ImportField = "date" | "time" | "menu" | "option" | "quantity" | "amount" | "orderNo";
+export type ImportField = "date" | "time" | "menu" | "option" | "quantity" | "amount" | "orderNo" | "status";
 
 export const IMPORT_FIELDS: { field: ImportField; label: string; required: boolean }[] = [
   { field: "date", label: "날짜(·시각)", required: true },
@@ -14,6 +14,7 @@ export const IMPORT_FIELDS: { field: ImportField; label: string; required: boole
   { field: "quantity", label: "수량", required: true },
   { field: "amount", label: "금액", required: false },
   { field: "orderNo", label: "주문번호", required: false },
+  { field: "status", label: "취소 여부(상태)", required: false },
 ];
 
 export type ImportColumns = Partial<Record<ImportField, number>>;
@@ -92,6 +93,7 @@ const HEADER_HINTS: Record<ImportField, string[]> = {
   quantity: ["판매수량", "주문수량", "수량", "개수", "qty", "quantity"],
   amount: ["실판매금액", "실매출액", "실매출", "순매출", "결제금액", "판매금액", "매출금액", "매출액", "판매액", "금액", "amount", "sales"],
   orderNo: ["주문번호", "영수증번호", "거래번호", "결제번호", "주문id", "order"],
+  status: ["결제상태", "주문상태", "거래상태", "취소여부", "거래구분", "매출구분", "상태", "status"],
 };
 
 function hintRank(header: string, field: ImportField): number {
@@ -109,7 +111,7 @@ export function guessColumns(header: string[]): ImportColumns {
   const used = new Set<number>();
   const columns: ImportColumns = {};
   // 이름이 겹치기 쉬운 것부터 (예: "판매수량"·"판매금액"이 "판매일" 보다 먼저 자리를 잡게)
-  const order: ImportField[] = ["orderNo", "quantity", "amount", "option", "menu", "time", "date"];
+  const order: ImportField[] = ["orderNo", "status", "quantity", "amount", "option", "menu", "time", "date"];
   for (const field of order) {
     let best = -1;
     let bestRank = Infinity;
@@ -219,8 +221,9 @@ export interface SaleImportRow {
   time: string | null;
   /** 파일의 메뉴 이름 (옵션 열이 있으면 "메뉴 / 옵션") */
   name: string;
+  /** 음수 = 취소·반품 (매출과 재료 차감을 되돌린다) */
   quantity: number;
-  /** 원. 금액 열이 없으면 null (메뉴 가격 × 수량) */
+  /** 원. 금액 열이 없으면 null (메뉴 가격 × 수량). 취소 줄은 0 이하 */
   amount: number | null;
   /** 같은 행을 두 번 가져오지 않기 위한 키. 파일 내용으로 만든다 (같은 내용 행은 몇 번째인지 붙임) */
   key: string;
@@ -232,6 +235,8 @@ export interface SaleImportIssue {
 }
 
 const TOTAL_ROW = /^(합계|총계|소계|총합계|total)$/i;
+/** 상태 열에 이 말이 있으면 취소된 주문 */
+const REFUND_STATUS = /취소|환불|반품|cancel|refund|return|void/i;
 
 /** 표의 데이터 행을 판매 행으로 읽는다. 읽을 수 없는 행은 issues 로 (줄 번호와 이유) */
 export function readSaleRows(
@@ -270,32 +275,46 @@ export function readSaleRows(
       issues.push({ line, reason: `날짜를 읽을 수 없음 (${cell(r, "date") || "빈 칸"})` });
       return;
     }
-    const quantity = parseImportNumber(cell(r, "quantity"));
-    if (quantity === null || !Number.isInteger(quantity)) {
+    const parsedQuantity = parseImportNumber(cell(r, "quantity"));
+    if (parsedQuantity === null || !Number.isInteger(parsedQuantity)) {
       issues.push({ line, reason: `수량을 읽을 수 없음 (${cell(r, "quantity") || "빈 칸"})` });
       return;
     }
-    if (quantity <= 0) {
-      issues.push({ line, reason: "수량이 0 이하 (취소·반품)" });
+    if (parsedQuantity === 0) {
+      issues.push({ line, reason: "수량이 0" });
       return;
     }
-    if (quantity > 10000) {
+    if (Math.abs(parsedQuantity) > 10000) {
       issues.push({ line, reason: "수량이 너무 큼" });
       return;
     }
-    let amount: number | null = null;
+    let parsedAmount: number | null = null;
     if (columns.amount !== undefined) {
-      amount = parseImportNumber(cell(r, "amount"));
-      if (amount === null || amount < 0) {
+      parsedAmount = parseImportNumber(cell(r, "amount"));
+      if (parsedAmount === null) {
         issues.push({ line, reason: `금액을 읽을 수 없음 (${cell(r, "amount") || "빈 칸"})` });
         return;
       }
-      amount = Math.round(amount);
+      parsedAmount = Math.round(parsedAmount);
     }
-    const base = [when.date, when.time ?? "", cell(r, "orderNo"), name, quantity, amount ?? ""].join("|");
-    const n = (seen.get(base) ?? 0) + 1;
-    seen.set(base, n);
-    rows.push({ line, date: when.date, time: when.time, name, quantity, amount, key: `${base}#${n}` });
+
+    // 취소·반품. POS 마다 나타내는 방법이 다르다.
+    //  1) 따로 있는 취소 줄: 수량이나 금액이 음수 → 취소 줄 하나 (음수 판매)
+    //  2) 원래 주문 줄에 상태만 "취소": 판매 줄 + 취소 줄 두 개로 만든다. 판매 줄의 키는 상태를 빼고 만들어
+    //     예전에 "완료"로 이미 가져온 같은 주문과 키가 같으므로, 그때는 판매 줄은 건너뛰고 취소 줄만 들어가 상계된다.
+    const negative = parsedQuantity < 0 || (parsedAmount !== null && parsedAmount < 0);
+    const cancelledStatus = !negative && REFUND_STATUS.test(cell(r, "status"));
+    const quantity = Math.abs(parsedQuantity) * (negative ? -1 : 1);
+    const amount = parsedAmount === null ? null : Math.abs(parsedAmount) * (negative ? -1 : 1);
+
+    const push = (q: number, a: number | null, keySuffix = "") => {
+      const base = [when.date, when.time ?? "", cell(r, "orderNo"), name, q, a ?? ""].join("|");
+      const n = (seen.get(base + keySuffix) ?? 0) + 1;
+      seen.set(base + keySuffix, n);
+      rows.push({ line, date: when.date, time: when.time, name, quantity: q, amount: a, key: `${base}#${n}${keySuffix}` });
+    };
+    push(quantity, amount);
+    if (cancelledStatus) push(-quantity, amount === null ? null : -amount, "|취소");
   });
   return { rows, issues };
 }
@@ -331,16 +350,20 @@ export function matchMenus(
 export interface ImportNameSummary {
   name: string;
   rows: number;
+  /** 취소를 뺀 수량 */
   quantity: number;
+  /** 취소·반품 줄 수 */
+  refunds: number;
 }
 
 /** 파일의 메뉴 이름별 행 수·수량 (많이 팔린 순) */
 export function summarizeNames(rows: SaleImportRow[]): ImportNameSummary[] {
   const map = new Map<string, ImportNameSummary>();
   for (const r of rows) {
-    const s = map.get(r.name) ?? { name: r.name, rows: 0, quantity: 0 };
+    const s = map.get(r.name) ?? { name: r.name, rows: 0, quantity: 0, refunds: 0 };
     s.rows += 1;
     s.quantity += r.quantity;
+    if (r.quantity < 0) s.refunds += 1;
     map.set(r.name, s);
   }
   return [...map.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name, "ko"));

@@ -89,7 +89,7 @@ NestJS에서는 `SalesService.cancel()` 에서 같은 트랜잭션으로 지우�
 
 | | |
 |---|---|
-| 마이그레이션 | `supabase/migrations/20261008055315_sale_import_functions.sql` (표는 `..._sale_imports.sql`, 합계 뷰는 `..._sale_import_summaries.sql`) |
+| 마이그레이션 | 지금 내용은 `supabase/migrations/20261008062523_import_sales_refunds.sql` (처음 `..._sale_import_functions.sql`, 취소한 키 건너뛰기 `..._sale_cancel_keys.sql`, 부호 제약 `..._sale_refunds.sql`) (표는 `..._sale_imports.sql`·`..._cancelled_sale_keys.sql`, 합계 뷰는 `..._sale_import_summaries.sql`) |
 | 호출하는 곳 | `apps/web/src/lib/api/sale-imports.ts` `importSaleRows()` ← 화면 `/sales/import` 가 500건씩 나눠 부른다 |
 | NestJS 대응 | `SalesService.import()` (예정). `record_sales` 와 같은 차감 로직을 쓴다 |
 | 권한 | 사장·매니저 (`sale:import`, 함수 안에서 `is_store_admin`) |
@@ -105,13 +105,16 @@ NestJS에서는 `SalesService.cancel()` 에서 같은 트랜잭션으로 지우�
 1. 로그인, 가져오기가 있고 그 매장 사장·매니저인지, 행 수
 2. 모든 메뉴가 그 매장 것인지 (보관된 메뉴도 받는다: 지난 판매)
 3. 재료 품목 잠금 (id 순)
-4. 행마다: 수량(1~10000)·금액(≥0)·판매 시각(미래 불가)·키(1~300자) 검증 → `sale_records` INSERT **ON CONFLICT DO NOTHING** (`sale_records_external_key` = 매장·source·external_id) → 새로 들어간 행만 레시피 재료 차감
+4. 행마다: 수량(0 아님, 절댓값 ≤ 10000)·금액(수량과 같은 부호 또는 0)·판매 시각(미래 불가)·키(1~300자) 검증 → `cancelled_sale_keys` 에 있는 키(판매 화면에서 하나씩 취소한 판매)는 건너뜀 → `sale_records` INSERT **ON CONFLICT DO NOTHING** (`sale_records_external_key` = 매장·source·external_id) → 새로 들어간 행만 재료 처리
+   - 수량 > 0 (판매): 레시피대로 `stock_outflow` 차감
+   - 수량 < 0 (**취소·반품**): 판매를 음수로 기록(매출 상계)하고 레시피 재료를 `sale` 원장 **+** 로 되돌린다 (로트 없이, memo "판매 취소(CSV)"). 이론 vs 실제의 판매 차감량도 원장 합계라 자동으로 상계된다
 5. 하나라도 실패하면 그 묶음 전체가 취소된다. 앞 묶음은 남지만, 같은 파일을 다시 올리면 키가 같아 남은 것만 들어간다
 
-`external_id` = 파일 내용으로 만든 행 키: `날짜|시각|주문번호|메뉴 이름|수량|금액#같은 내용 몇 번째`. 같은 파일·기간이 겹치는 파일을 다시 올려도 중복되지 않는다. 메뉴 매칭과 상관없는 값이라 매칭을 바꿔도 같다.
+`external_id` = 파일 내용으로 만든 행 키: `날짜|시각|주문번호|메뉴 이름|수량|금액#같은 내용 몇 번째`. 상태 열이 "취소"인 주문 줄은 화면이 판매 줄(상태를 뺀 같은 키) + 취소 줄(키 끝 `|취소`) 두 행으로 보낸다 → 예전에 "완료"로 가져온 같은 주문은 판매 줄이 건너뛰어지고 취소 줄만 들어가 상계된다. 같은 파일·기간이 겹치는 파일을 다시 올려도 중복되지 않는다. 메뉴 매칭과 상관없는 값이라 매칭을 바꿔도 같다.
 판매 시각은 화면이 보낸 매장 시간대 날짜·시각을 서버 액션이 변환한다 (시각이 없으면 그 날 23:59:59, 오늘이면 지금).
 
-**가져오기 취소**는 `sale_imports` 한 행 삭제다 (`cancelSaleImport()`, RLS `sale_imports_delete`). `sale_records.import_id` → 판매 → 원장으로 cascade 된다. 판매 취소와 같은 원장 삭제 예외.
+**가져오기 취소**는 `sale_imports` 한 행 삭제다 (`cancelSaleImport()`, RLS `sale_imports_delete`). `sale_records.import_id` → 판매 → 원장으로 cascade 된다. 판매 취소와 같은 원장 삭제 예외. 취소한 키는 남기지 않으므로 같은 파일을 다시 올릴 수 있다.
+**가져온 판매 하나만 취소**(판매 화면)하면 트리거가 그 키를 `cancelled_sale_keys`(매장·source·external_id, 정책 없음 = 클라이언트 접근 불가)에 남긴다. 기간이 겹치는 파일을 다시 올려도 취소한 판매(예: 환불)가 되살아나지 않는다. 되돌리려면 판매 화면에서 직접 입력한다.
 메뉴 이름 매칭은 `menu_aliases`(매장·파일의 이름 → 메뉴, null 이면 가져오지 않음)에 직접 upsert 한다 (한 문장, 사장·매니저, 같은 매장 메뉴만).
 
 ### `start_stock_count` — 재고 실사 시작
@@ -289,7 +292,7 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 | `items_prevent_base_unit_change` | `..._catalog_triggers.sql` | 입출고·레시피에 쓰인 품목의 기본 단위 변경 차단 | **유지 권장** (데이터 무결성 규칙). 서비스에서도 같은 확인을 해서 친절한 오류를 먼저 낸다 |
 | `stock_count_lines_set_counted` → `set_stock_count_line_counted()` | `..._stock_count_functions.sql` | 센 수량이 바뀌면 센 시각·센 사람 기록 (지우면 둘 다 null) | 서비스에서 같은 값을 직접 기록하거나 트리거 유지 |
 | `stores_validate` → `validate_store()` | `..._store_settings.sql` | 매장 이름 앞뒤 공백 제거·1~50자, 시간대가 `pg_timezone_names` 에 있는지 확인 (만들기·수정 모두) | **유지 권장.** 잘못된 시간대가 들어가면 모든 화면의 날짜 계산이 깨진다. 서비스에서도 core `isValidTimeZone` 으로 먼저 확인 |
-| `sale_records_broadcast_cancel` → `broadcast_sale_cancelled()` | `..._sale_cancel_broadcast.sql`, 조건은 `..._sale_import_functions.sql` | 판매가 지워지면 비공개 Realtime 채널 `store:<매장 id>` 로 `sale_cancelled` 방송. 가져오기로 들어온 판매(`import_id` 있음)는 건너뜀 | 판매 취소 서비스가 게이트웨이로 직접 알리고 트리거·`realtime.messages` 정책을 지운다 |
+| `sale_records_broadcast_cancel` → `broadcast_sale_cancelled()` | `..._sale_cancel_broadcast.sql`, 지금 내용은 `..._sale_cancel_keys.sql` | 판매가 지워지면 비공개 Realtime 채널 `store:<매장 id>` 로 `sale_cancelled` 방송. 행 키(`external_id`)가 있으면 `cancelled_sale_keys` 에 남긴다. 가져오기 전체 취소의 cascade(그 `sale_imports` 행이 이미 없음)는 둘 다 건너뜀 | 판매 취소 서비스가 게이트웨이로 직접 알리고 취소한 키를 기록, 트리거·`realtime.messages` 정책을 지운다 |
 | `sale_imports_broadcast_cancel` → `broadcast_sale_import_cancelled()` | `..._sale_import_functions.sql` | 가져오기를 지우면 판매마다가 아니라 한 번만 `sale_cancelled` 방송 | 가져오기 취소 서비스가 게이트웨이로 알린다 |
 
 함께 바뀐 권한

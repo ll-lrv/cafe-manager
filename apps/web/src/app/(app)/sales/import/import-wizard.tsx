@@ -87,6 +87,8 @@ export function SalesImportWizard({
   const totalQuantity = toImport.reduce((sum, r) => sum + r.quantity, 0);
   const totalAmount = toImport.reduce((sum, r) => sum + (r.amount ?? (priceOf.get(choiceOf(r.name)) ?? 0) * r.quantity), 0);
   const dates = toImport.map((r) => r.date).sort();
+  const refundCount = rows.filter((r) => r.quantity < 0).length;
+  const importRefunds = toImport.filter((r) => r.quantity < 0).length;
 
   async function onFile(f: File | undefined) {
     if (!f) return;
@@ -157,7 +159,7 @@ export function SalesImportWizard({
         await cancelImportAction(undefined, form);
         toast.info("이 파일의 판매는 모두 이미 가져왔습니다.");
       } else {
-        toast.success(`판매 ${inserted.toLocaleString("ko-KR")}건을 가져왔습니다.`, {
+        toast.success(`${inserted.toLocaleString("ko-KR")}건을 가져왔습니다.`, {
           description: skipped > 0 ? `이미 가져온 ${skipped.toLocaleString("ko-KR")}건은 건너뛰었습니다.` : undefined,
           duration: 8_000,
         });
@@ -258,7 +260,10 @@ export function SalesImportWizard({
                             {r.date} {r.time?.slice(0, 5)}
                           </td>
                           <td className="px-3 py-1.5">{r.name}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums">{r.quantity.toLocaleString("ko-KR")}</td>
+                          <td className="px-3 py-1.5 text-right whitespace-nowrap tabular-nums">
+                            {r.quantity.toLocaleString("ko-KR")}
+                            {r.quantity < 0 && <span className="ml-1 text-xs text-destructive">취소</span>}
+                          </td>
                           <td className="px-3 py-1.5 text-right whitespace-nowrap tabular-nums">
                             {r.amount === null ? "메뉴 가격" : won(r.amount)}
                           </td>
@@ -272,6 +277,12 @@ export function SalesImportWizard({
                   {parsed.issues.length > 0 && ` 읽지 않은 줄 ${parsed.issues.length.toLocaleString("ko-KR")}개.`}
                   {futureCount > 0 && ` 미래 날짜 ${futureCount.toLocaleString("ko-KR")}줄은 빼고 가져옵니다.`}
                 </p>
+                {refundCount > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    취소·반품 {refundCount.toLocaleString("ko-KR")}줄은 매출에서 빼고 재료를 되돌립니다. 상태가
+                    &quot;취소&quot;인 주문은 판매와 취소를 함께 기록해 0이 되고, 예전에 가져온 같은 주문도 취소됩니다.
+                  </p>
+                )}
                 {parsed.issues.length > 0 && (
                   <details className="text-sm">
                     <summary className="cursor-pointer text-muted-foreground">읽지 않은 줄 보기</summary>
@@ -283,12 +294,6 @@ export function SalesImportWizard({
                       ))}
                       {parsed.issues.length > 50 && <li>외 {parsed.issues.length - 50}줄</li>}
                     </ul>
-                    {parsed.issues.some((i) => i.reason.startsWith("수량이 0 이하")) && (
-                      <p className="mt-2 text-xs">
-                        취소·반품 줄은 가져오지 않습니다. 원래 판매가 같은 파일에 있으면 그 판매도 빼려면 판매 화면에서
-                        취소해 주세요.
-                      </p>
-                    )}
                   </details>
                 )}
               </>
@@ -317,6 +322,7 @@ export function SalesImportWizard({
                       <span className="text-sm font-medium break-all">{n.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {n.rows.toLocaleString("ko-KR")}줄 · {n.quantity.toLocaleString("ko-KR")}개
+                        {n.refunds > 0 && ` · 취소 ${n.refunds.toLocaleString("ko-KR")}줄`}
                         {auto && " · 자동으로 맞춤"}
                       </span>
                     </div>
@@ -344,7 +350,8 @@ export function SalesImportWizard({
               {toImport.length > 0 ? (
                 <p>
                   <span className="font-medium">
-                    판매 {toImport.length.toLocaleString("ko-KR")}줄 · {totalQuantity.toLocaleString("ko-KR")}개 ·{" "}
+                    {toImport.length.toLocaleString("ko-KR")}줄
+                    {importRefunds > 0 && ` (취소 ${importRefunds.toLocaleString("ko-KR")}줄)`} · {totalQuantity.toLocaleString("ko-KR")}개 ·{" "}
                     {won(totalAmount)}
                   </span>
                   <span className="text-muted-foreground">
@@ -362,7 +369,7 @@ export function SalesImportWizard({
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <Button onClick={runImport} disabled={pending || unmatched.length > 0 || toImport.length === 0}>
-                  {pending ? (progress ?? "가져오는 중…") : `판매 ${toImport.length.toLocaleString("ko-KR")}줄 가져오기`}
+                  {pending ? (progress ?? "가져오는 중…") : `${toImport.length.toLocaleString("ko-KR")}줄 가져오기`}
                 </Button>
                 <Button variant="ghost" onClick={reset} disabled={pending}>
                   다른 파일

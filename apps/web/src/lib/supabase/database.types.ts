@@ -23,7 +23,27 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "categories": {
+            "cancelled_sale_keys": {
+                  Row: {
+                    "created_at": string,"external_id": string,"source": Database["public"]['Enums']["sale_source"],"store_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"external_id": string,"source": Database["public"]['Enums']["sale_source"],"store_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"external_id"?: string,"source"?: Database["public"]['Enums']["sale_source"],"store_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "cancelled_sale_keys_store_id_stores_id_fk"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"categories": {
                   Row: {
                     "created_at": string,"id": string,"name": string,"sort_order": number,"store_id": string
                   }

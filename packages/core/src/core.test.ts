@@ -396,12 +396,14 @@ describe("sales import", () => {
     expect(parseImportNumber("")).toBeNull();
   });
 
-  it("행 읽기: 옵션 붙이기, 같은 내용 행 구분, 취소·합계 줄", () => {
+  it("행 읽기: 옵션 붙이기, 같은 내용 행 구분, 취소 줄, 합계 줄", () => {
     const table = [
       ["날짜", "상품명", "옵션", "수량", "금액"],
       ["2026-10-07 09:00", "아메리카노", "ICE", "1", "4,500"],
       ["2026-10-07 09:00", "아메리카노", "ICE", "1", "4,500"],
       ["2026-10-07 09:10", "라떼", "", "-1", "-5,000"],
+      ["2026-10-07 09:20", "라떼", "", "1", "-5,000"], // 수량은 양수, 금액만 음수인 취소 줄
+      ["2026-10-07 09:30", "라떼", "", "0", "0"],
       ["합계", "", "", "1", "4,000"],
       ["어제", "라떼", "", "1", "5,000"],
     ];
@@ -409,13 +411,32 @@ describe("sales import", () => {
     expect(rows.map((r) => [r.name, r.quantity, r.amount, r.time, r.key])).toEqual([
       ["아메리카노 / ICE", 1, 4500, "09:00:00", "2026-10-07|09:00:00||아메리카노 / ICE|1|4500#1"],
       ["아메리카노 / ICE", 1, 4500, "09:00:00", "2026-10-07|09:00:00||아메리카노 / ICE|1|4500#2"],
+      ["라떼", -1, -5000, "09:10:00", "2026-10-07|09:10:00||라떼|-1|-5000#1"],
+      ["라떼", -1, -5000, "09:20:00", "2026-10-07|09:20:00||라떼|-1|-5000#1"],
     ]);
     expect(issues).toEqual([
-      { line: 4, reason: "수량이 0 이하 (취소·반품)" },
-      { line: 5, reason: "합계 줄" },
-      { line: 6, reason: "날짜를 읽을 수 없음 (어제)" },
+      { line: 6, reason: "수량이 0" },
+      { line: 7, reason: "합계 줄" },
+      { line: 8, reason: "날짜를 읽을 수 없음 (어제)" },
     ]);
-    expect(summarizeNames(rows)).toEqual([{ name: "아메리카노 / ICE", rows: 2, quantity: 2 }]);
+    expect(summarizeNames(rows)).toEqual([
+      { name: "아메리카노 / ICE", rows: 2, quantity: 2, refunds: 0 },
+      { name: "라떼", rows: 2, quantity: -2, refunds: 2 },
+    ]);
+  });
+
+  it("상태가 취소인 주문 줄 → 판매 + 취소 두 줄 (예전에 가져온 판매도 상계)", () => {
+    const header = ["주문번호", "결제일시", "상품명", "수량", "실판매금액", "결제상태"];
+    const columns = guessColumns(header);
+    expect(columns.status).toBe(5);
+    const done = readSaleRows([header, ["A1", "2026-10-07 09:00", "라떼", "2", "10,000", "완료"]], 0, columns).rows;
+    const cancelled = readSaleRows([header, ["A1", "2026-10-07 09:00", "라떼", "2", "10,000", "결제취소"]], 0, columns).rows;
+    expect(cancelled.map((r) => [r.quantity, r.amount, r.key])).toEqual([
+      [2, 10000, "2026-10-07|09:00:00|A1|라떼|2|10000#1"],
+      [-2, -10000, "2026-10-07|09:00:00|A1|라떼|-2|-10000#1|취소"],
+    ]);
+    // 어제 "완료"로 가져온 판매와 판매 줄의 키가 같다 → 그 줄은 건너뛰고 취소 줄만 들어간다
+    expect(cancelled[0]!.key).toBe(done[0]!.key);
   });
 
   it("메뉴 매칭: 저장한 매칭 → 같은 이름", () => {

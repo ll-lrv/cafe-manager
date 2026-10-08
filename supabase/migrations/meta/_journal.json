@@ -148,6 +148,34 @@
       "when": 1791438970023,
       "tag": "20261008055610_sale_import_summaries",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791440383314,
+      "tag": "20261008061943_cancelled_sale_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791440385011,
+      "tag": "20261008061945_sale_cancel_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791440719151,
+      "tag": "20261008062519_sale_refunds",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791440723684,
+      "tag": "20261008062523_import_sales_refunds",
+      "breakpoints": true
     }
   ]
 }
