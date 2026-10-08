@@ -13,6 +13,9 @@ import {
   formatQuantity,
   formatUnitCount,
   CAFE_TEMPLATE,
+  avtLine,
+  avtSummary,
+  sortAvtLines,
   oneUnitLabel,
   fromBaseQuantity,
   mergeDeltas,
@@ -264,5 +267,52 @@ describe("templates", () => {
         expect(r.quantity).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe("avt", () => {
+  // 우유: 판매 10,000ml, 레시피 밖 사용 300, 폐기 500, 실사에서 1,200 모자람, 직접 조정 +100 (입고 누락 바로잡기)
+  const milk = { itemId: "milk", received: 12000, sold: -10000, consumed: -300, wasted: -500, countAdjusted: -1200, manualAdjusted: 100, counted: true };
+
+  it("이론·실제·차이와 원인을 나눈다", () => {
+    const l = avtLine(milk, 2.8);
+    expect(l.theoretical).toBe(10000);
+    expect(l.causes).toEqual({ consumed: 300, wasted: 500, countLoss: 1200, otherAdjust: -100 });
+    expect(l.variance).toBe(1900);
+    expect(l.actual).toBe(11900);
+    expect(l.varianceRate).toBeCloseTo(0.19);
+    expect(l.theoreticalCost).toBe(28000);
+    expect(l.actualCost).toBe(33320);
+    expect(l.varianceCost).toBe(5320);
+  });
+
+  it("판매가 없으면 차이율은 없고, 단가가 없으면 금액도 없다", () => {
+    const l = avtLine({ itemId: "x", received: 0, sold: 0, consumed: -5, wasted: 0, countAdjusted: 0, manualAdjusted: 0, counted: true }, null);
+    expect(l.varianceRate).toBeNull();
+    expect(l.varianceCost).toBeNull();
+  });
+
+  it("실사에서 남으면 차이가 음수가 된다", () => {
+    const l = avtLine({ itemId: "bean", received: 0, sold: -1000, consumed: 0, wasted: 0, countAdjusted: 50, manualAdjusted: 0, counted: true }, 25);
+    expect(l.variance).toBe(-50);
+    expect(l.varianceCost).toBe(-1250);
+  });
+
+  it("합계·원가율·단가 없는 품목 수", () => {
+    const lines = [
+      avtLine(milk, 2.8),
+      avtLine({ itemId: "bean", received: 0, sold: -1000, consumed: 0, wasted: 0, countAdjusted: 50, manualAdjusted: 0, counted: true }, 25),
+      avtLine({ itemId: "cup", received: 0, sold: -60, consumed: 0, wasted: 0, countAdjusted: -2, manualAdjusted: 0, counted: true }, null),
+    ];
+    const s = avtSummary(lines, 300000);
+    expect(s.theoreticalCost).toBe(28000 + 25000);
+    expect(s.actualCost).toBe(33320 + 23750);
+    expect(s.varianceCost).toBe(5320 - 1250);
+    expect(s.causeCosts).toEqual({ consumed: 840, wasted: 1400, countLoss: 3360 - 1250, otherAdjust: -280 });
+    expect(s.theoreticalCostRate).toBeCloseTo(53000 / 300000);
+    expect(s.missingCostCount).toBe(1);
+    expect(s.uncountedCount).toBe(0);
+    expect(avtSummary([avtLine({ ...milk, counted: false }, 2.8)], 0).uncountedCount).toBe(1);
+    expect(sortAvtLines(lines).map((l) => l.itemId)).toEqual(["milk", "bean", "cup"]);
   });
 });

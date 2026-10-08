@@ -684,6 +684,11 @@ isOneToOne: false
                            },
 "stock_outflow":
 { Args: { "p_created_by": string,"p_factor": number,"p_item_id": string,"p_memo": string,"p_occurred_at": string,"p_quantity": number,"p_sale_record_id"?: string,"p_stock_count_id"?: string,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id": string }; Returns: number
+                           },
+"stock_usage_summary":
+{ Args: { "p_from": string,"p_store_id": string,"p_to": string }; Returns: {
+              "consumed": number,"count_adjusted": number,"counted": boolean,"item_id": string,"manual_adjusted": number,"received": number,"sold": number,"wasted": number
+            }[]
                            }
           }
           Enums: {

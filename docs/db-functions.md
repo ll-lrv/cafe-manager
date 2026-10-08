@@ -231,6 +231,22 @@ NestJS에서는 `SalesService.cancel()` 에서 같은 트랜잭션으로 지우�
 아직 구성원이 아닌 사람이 초대 링크로 매장 이름과 역할을 보기 위한 함수. RLS 때문에 함수로 둔 것이라 트랜잭션 이유는 없다.
 NestJS에서는 토큰으로 조회하는 공개 API 하나로 대체한다. (`members.ts` `getInvitation()`)
 
+### `stock_usage_summary` — 기간별 입출고 합계 (읽기 전용, 이론 vs 실제 리포트)
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261008033540_stock_usage_summary.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/reports.ts` `getUsageTotals()` → `/reports` |
+| NestJS 대응 | `ReportsService.usageTotals()` (예정). 같은 집계 SQL 을 그대로 쓰면 된다 |
+| 권한 | `SECURITY INVOKER` (RLS 그대로). 화면은 `report:view`(사장·매니저)만 |
+| core 대응 | `avtLine`, `avtSummary`, `sortAvtLines` (`avt.ts`, 계산은 모두 여기) |
+
+PostgREST 에서 집계(sum·group by)를 쓸 수 없어 함수로 둔 것이고, 트랜잭션 이유는 없다.
+입력 `p_from` 이상 `p_to` 미만(`occurred_at`). 품목별로 종류마다 원장 합계(부호 그대로)를 낸다.
+실사 조정은 `stock_count_id` 가 있는 adjust, 직접 조정은 없는 adjust. `counted` 는 그 기간에 끝난 실사에서 센 품목인지
+(차이가 0 이라 조정 원장이 없어도 true. false 면 실사 차이를 모른다).
+실사 구간 리포트는 (앞 실사 완료 시각, 이번 실사 완료 시각] 으로 자른다. 실사 조정 원장이 완료 시각(`now()`)에 기록되기 때문.
+
 ### 권한 확인 함수 — `has_store_role`, `is_store_member`, `is_store_admin`
 
 RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()` 이 대신한다. RLS를 끌 때 함께 지운다.
