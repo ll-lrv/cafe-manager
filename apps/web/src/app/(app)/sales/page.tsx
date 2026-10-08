@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listItems } from "@/lib/api/catalog";
 import { listMenus } from "@/lib/api/menus";
+import { listOptions, toOptionRules } from "@/lib/api/options";
 import { listSales } from "@/lib/api/sales";
 import { getStockLevels } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
@@ -23,11 +24,12 @@ export default async function SalesPage({ searchParams }: PageProps<"/sales">) {
   const date = isValidDate(dateParam) && dateParam <= today ? dateParam : today;
   const isToday = date === today;
 
-  const [menus, items, stock, sales] = await Promise.all([
+  const [menus, items, stock, sales, options] = await Promise.all([
     listMenus(store.storeId),
     listItems(store.storeId),
     getStockLevels(store.storeId),
     listSales(store.storeId, storeDayRange(date, store.timeZone)),
+    listOptions(store.storeId),
   ]);
 
   const activeMenus = menus.filter((m) => !m.archivedAt);
@@ -116,6 +118,9 @@ export default async function SalesPage({ searchParams }: PageProps<"/sales">) {
                 // 날짜를 바꾸면 입력 중인 수량을 비우고 다시 시작한다.
                 key={date}
                 menus={activeMenus}
+                options={options
+                  .filter((o) => !o.archivedAt)
+                  .map((o) => ({ id: o.id, name: o.name, price: o.price, rules: toOptionRules(o) }))}
                 items={itemInfo}
                 stock={stock}
                 date={date}

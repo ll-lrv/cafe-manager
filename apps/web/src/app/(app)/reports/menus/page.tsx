@@ -4,10 +4,11 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLatestCosts, listMenus, type Menu } from "@/lib/api/menus";
+import { listOptions } from "@/lib/api/options";
 import { getMenuSales } from "@/lib/api/reports";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { cn } from "@/lib/utils";
-import { menuCost, overTargetMenus } from "../../menus/menu-cost";
+import { menuCost, optionSetCost, overTargetMenus } from "../../menus/menu-cost";
 import { OverTargetList } from "../../menus/over-target-list";
 import { resolvePeriods } from "../periods";
 import { PeriodPicker, ReportTabs, signedWon, SummaryCard, won } from "../report-parts";
@@ -34,20 +35,28 @@ export default async function MenuProfitPage({ searchParams }: PageProps<"/repor
     return <p className="text-sm text-muted-foreground">리포트는 사장과 매니저만 볼 수 있습니다.</p>;
   }
   const periods = await resolvePeriods(store, params, { basePath: "/reports/menus", withCounts: false, defaultDays: 30 });
-  const [menus, costs, sales] = await Promise.all([
+  const [menus, costs, sales, options] = await Promise.all([
     listMenus(store.storeId),
     getLatestCosts(store.storeId),
     getMenuSales(store.storeId, periods.period.range),
+    listOptions(store.storeId),
   ]);
+  const optionById = new Map(options.map((o) => [o.id, o]));
 
   const menuById = new Map(menus.map((m) => [m.id, m]));
   const menuCosts = new Map(menus.map((m) => [m.id, menuCost(m, costs, store.targetCostRate)]));
+  // 재료비: 옵션 묶음마다 옵션을 반영한 지금 원가 × 판매량
+  const incompleteMenus = new Set(menus.filter((m) => menuCosts.get(m.id)!.missing.length > 0).map((m) => m.id));
+  const salesWithCost = sales.flatMap((s) => {
+    const menu = menuById.get(s.menuId);
+    if (!menu) return [];
+    const { cost, incomplete } = optionSetCost(menu, s.optionIds.flatMap((id) => optionById.get(id) ?? []), costs);
+    if (incomplete) incompleteMenus.add(menu.id);
+    return [{ ...s, cost: cost * s.quantity }];
+  });
   const { lines, summary } = menuProfitLines(
-    menus.map((m) => {
-      const c = menuCosts.get(m.id)!;
-      return { menuId: m.id, unitCost: c.cost, costIncomplete: c.missing.length > 0, noRecipe: m.recipe.length === 0 };
-    }),
-    sales,
+    menus.map((m) => ({ menuId: m.id, costIncomplete: incompleteMenus.has(m.id), noRecipe: m.recipe.length === 0 })),
+    salesWithCost,
   );
   const classCounts = CLASS_ORDER.map((c) => [c, lines.filter((l) => l.class === c).length] as const);
   const hasClasses = classCounts.some(([, n]) => n > 0);
@@ -63,7 +72,7 @@ export default async function MenuProfitPage({ searchParams }: PageProps<"/repor
         <h1 className="text-xl font-bold">메뉴 수익성</h1>
         <p className="text-sm text-muted-foreground">
           메뉴별로 매출에서 재료비를 뺀 마진이 큰 순입니다. 판매량과 개당 마진으로 많이 벌어 주는 메뉴와 많이 팔리지만
-          남는 게 적은 메뉴를 나눕니다. 재료비는 지금 레시피와 최근 입고 단가 기준입니다.
+          남는 게 적은 메뉴를 나눕니다. 재료비는 지금 레시피(옵션 포함)와 최근 입고 단가 기준입니다.
         </p>
       </div>
 

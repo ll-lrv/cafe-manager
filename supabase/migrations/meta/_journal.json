@@ -190,6 +190,27 @@
       "when": 1791467776578,
       "tag": "20261008135616_menu_profit",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791469544928,
+      "tag": "20261008142544_menu_options",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791469601610,
+      "tag": "20261008142641_menu_option_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791470030831,
+      "tag": "20261008143350_menu_option_rules_check",
+      "breakpoints": true
     }
   ]
 }

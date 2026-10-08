@@ -19,7 +19,7 @@ const PERMISSIONS = {
   "sale:cancel": ["owner", "manager"],
   /** 판매 파일(CSV) 가져오기·가져오기 취소, 메뉴 이름 매칭 */
   "sale:import": ["owner", "manager"],
-  /** 품목·카테고리·단위·메뉴·레시피 관리 */
+  /** 품목·카테고리·단위·메뉴·레시피·옵션 관리 */
   "catalog:manage": ["owner", "manager"],
   /** 거래처 관리 */
   "supplier:manage": ["owner", "manager"],

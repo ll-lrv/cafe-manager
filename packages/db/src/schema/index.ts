@@ -6,3 +6,4 @@ export * from "./purchasing";
 export * from "./counts";
 export * from "./sales";
 export * from "./inventory";
+export * from "./options";

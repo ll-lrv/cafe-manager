@@ -18,9 +18,10 @@ function readLines(formData: FormData): SaleLine[] {
   try {
     const parsed: unknown = JSON.parse(String(formData.get("lines") ?? "[]"));
     if (!Array.isArray(parsed)) throw new Error();
-    return parsed.map((l: { menuId?: unknown; quantity?: unknown }) => ({
+    return parsed.map((l: { menuId?: unknown; quantity?: unknown; optionIds?: unknown }) => ({
       menuId: String(l.menuId ?? ""),
       quantity: Number(l.quantity),
+      optionIds: Array.isArray(l.optionIds) ? l.optionIds.map(String) : [],
     }));
   } catch {
     throw new ApiError("판매 수량을 확인해 주세요.");

@@ -57,23 +57,23 @@ NestJS로 옮길 때는 이 문서의 표를 보고 기능 단위로 하나씩 �
 
 | | |
 |---|---|
-| 마이그레이션 | `supabase/migrations/20261006041140_record_sales.sql` |
+| 마이그레이션 | `supabase/migrations/20261006041140_record_sales.sql`, 옵션: `20261008142641_menu_option_functions.sql` |
 | 호출하는 곳 | `apps/web/src/lib/api/sales.ts` `recordSales()` |
 | NestJS 대응 | `SalesService.record()` (예정). 나중에 POS/CSV 가져오기도 같은 서비스를 쓴다 |
 | 권한 | 매장 구성원 (`sale:record`) |
-| 잠금 | 레시피에 든 재료 `items` 행들을 **id 순으로** `FOR UPDATE` → 입출고·다른 판매와 동시에 들어와도 로트 계산이 겹치지 않고 교착을 피한다 |
-| 쓰는 테이블 | `sale_records`(메뉴마다 1행), `stock_movements`(재료·로트마다 `sale` 행, `sale_record_id` 연결) |
-| core 대응 | `saleDeductions`(사용량 × 판매 수량), `allocateFifo` |
-| 내부 호출 | `stock_outflow` |
+| 잠금 | 레시피·옵션 규칙에 든 재료 `items` 행들을 **id 순으로** `FOR UPDATE` → 입출고·다른 판매와 동시에 들어와도 로트 계산이 겹치지 않고 교착을 피한다 |
+| 쓰는 테이블 | `sale_records`(메뉴·옵션 묶음마다 1행), `sale_record_options`(붙인 옵션), `stock_movements`(재료·로트마다 `sale` 행, `sale_record_id` 연결) |
+| core 대응 | `applyOptions`(옵션 반영 재료), `saleDeductions`(사용량 × 판매 수량), `allocateFifo` |
+| 내부 호출 | `sale_ingredients`, `stock_outflow` |
 
-입력: `p_lines` = `[{"menu_id", "quantity"(1~10000 정수), "amount"(없으면 가격 × 수량)}]` (최대 200줄), `p_sold_at`(기본 지금, 미래 불가)
+입력: `p_lines` = `[{"menu_id", "quantity"(1~10000 정수), "amount"(없으면 (가격 + 옵션 금액) × 수량), "option_ids"(없으면 옵션 없음)}]` (최대 200줄, 같은 메뉴라도 옵션 묶음이 다르면 다른 줄), `p_sold_at`(기본 지금, 미래 불가)
 반환: 기록한 판매 건수
 
 처리 순서
 1. 로그인 확인, 줄 수 확인, 판매 시각 확인
 2. 모든 메뉴가 있고 **한 매장** 것이며 그 매장 구성원인지
 3. 재료 품목 잠금 (id 순)
-4. 줄마다: 보관 메뉴·수량·금액 검증 → `sale_records` 1행 → 레시피 재료마다 `stock_outflow(사용량 × 수량, type 'sale', memo '판매: 메뉴 N개', occurred_at = 판매 시각)`
+4. 줄마다: 보관 메뉴·수량·금액 검증 → 옵션 검증(같은 매장, 보관 안 됨, 중복 없음, 20개까지) → `sale_records` 1행 + `sale_record_options` → `sale_ingredients(메뉴, 옵션)` 재료마다 `stock_outflow(사용량 × 수량, type 'sale', memo '판매: 메뉴 + 옵션 N개', occurred_at = 판매 시각)`
 5. 하나라도 실패하면 전체가 취소된다 (트랜잭션)
 
 화면 쪽: 지난 날짜로 입력하면 `p_sold_at` = 그 날 23:59:59 (한국 시간). 오늘이면 지금 시각.
@@ -84,6 +84,19 @@ FK `ON DELETE CASCADE` 로 연결된 `sale` 원장이 함께 지워진다 — **
 NestJS에서는 `SalesService.cancel()` 에서 같은 트랜잭션으로 지우거나, 판매에 취소 상태를 두고 반대 원장을 남기는 방식 중 하나를 고른다.
 
 함께 바뀐 RLS: `sale_records` 의 INSERT 정책을 없앴다. 판매는 함수로만 기록한다.
+
+### `sale_ingredients` — 옵션을 반영한 메뉴 1개의 재료 (내부 전용)
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261008142641_menu_option_functions.sql` |
+| 호출하는 곳 | `record_sales` (클라이언트는 직접 부를 수 없다) |
+| NestJS 대응 | core `applyOptions` 를 그대로 쓰고 이 함수는 지운다 |
+| core 대응 | `applyOptions` (`options.ts`) — **같은 계산이라 하나를 바꾸면 다른 쪽도 바꾼다** |
+
+규칙(`menu_option_rules`) 적용 순서: 늘리기(`scale`, 레시피에 있는 재료만 곱함) → 바꾸기(`replace`, 늘린 뒤의 양을 기준으로 한 번씩만 옮김.
+A→B, B→C 가 함께 있어도 A 가 C 로 가지 않는다. 같은 재료를 바꾸는 규칙이 여럿이면 `item_id` 가 작은 것 하나) → 추가(`add`). 0 이하가 된 재료는 뺀다.
+옵션은 매장 단위라 어느 메뉴에나 붙는다. 메뉴에 없는 재료를 바꾸거나 늘리는 규칙은 그 메뉴에 아무것도 하지 않는다 (아메리카노 + 오트밀크 변경).
 
 ### `import_sales` — CSV 판매 가져오기
 
@@ -283,13 +296,13 @@ PostgREST 에서 집계(sum·group by)를 쓸 수 없어 함수로 둔 것이고
 
 | | |
 |---|---|
-| 마이그레이션 | `supabase/migrations/20261008135616_menu_profit.sql` |
+| 마이그레이션 | `supabase/migrations/20261008135616_menu_profit.sql`, 옵션 묶음별로: `20261008142641_menu_option_functions.sql` |
 | 호출하는 곳 | `apps/web/src/lib/api/reports.ts` `getMenuSales()` → `/reports`(매출), `/reports/menus`(메뉴 수익성) |
 | NestJS 대응 | `ReportsService.menuSales()` (예정). 같은 집계 SQL 을 그대로 쓰면 된다 |
 | 권한 | `SECURITY INVOKER` (RLS 그대로). 화면은 `report:view`(사장·매니저)만 |
 | core 대응 | `menuProfitLines` (`menu-profit.ts`, 마진·분류 계산은 모두 여기) |
 
-입력 `p_from` 이상 `p_to` 미만(`sold_at`). 메뉴별 판매량·금액 합계 (취소·반품 음수 판매는 상계, 금액 없는 판매는 0원).
+입력 `p_from` 이상 `p_to` 미만(`sold_at`). 메뉴·옵션 묶음(`option_ids`, 정렬된 배열, 없으면 빈 배열)별 판매량·금액 합계 (취소·반품 음수 판매는 상계, 금액 없는 판매는 0원). 옵션마다 재료비가 달라 묶음별로 나눈다.
 판매를 한 줄씩 읽으면 API 최대 행 수(`max_rows = 1000`)에 걸려 큰 기간의 합계가 틀어지므로 DB 에서 더한다.
 같은 마이그레이션에서 `stores.target_cost_rate`(매장 목표 원가율) 컬럼 수정 권한을 준다 (사장만, RLS `stores_update`).
 

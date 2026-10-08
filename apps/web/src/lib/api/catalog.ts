@@ -235,16 +235,19 @@ export async function getItem(storeId: string, itemId: string): Promise<Item | n
   return data ? toItem(data as ItemRow) : null;
 }
 
-/** 입출고나 레시피에 쓰였는지. 쓰인 품목은 기본 단위를 바꿀 수 없다. (DB 트리거가 최종 확인) */
+/** 입출고·레시피·옵션에 쓰였는지. 쓰인 품목은 기본 단위를 바꿀 수 없다. (DB 트리거가 최종 확인) */
 export async function isItemInUse(itemId: string): Promise<boolean> {
   const supabase = await createClient();
-  const [movements, recipes] = await Promise.all([
+  const results = await Promise.all([
     supabase.from("stock_movements").select("id", { count: "exact", head: true }).eq("item_id", itemId),
     supabase.from("recipe_ingredients").select("item_id", { count: "exact", head: true }).eq("item_id", itemId),
+    supabase
+      .from("menu_option_rules")
+      .select("id", { count: "exact", head: true })
+      .or(`item_id.eq.${itemId},from_item_id.eq.${itemId}`),
   ]);
-  if (movements.error) throw new ApiError(dbErrorMessage(movements.error));
-  if (recipes.error) throw new ApiError(dbErrorMessage(recipes.error));
-  return (movements.count ?? 0) + (recipes.count ?? 0) > 0;
+  for (const r of results) if (r.error) throw new ApiError(dbErrorMessage(r.error));
+  return results.some((r) => (r.count ?? 0) > 0);
 }
 
 export async function createItem(storeId: string, input: ItemInput): Promise<string> {

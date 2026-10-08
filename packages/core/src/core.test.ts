@@ -19,6 +19,8 @@ import {
   effectiveTargetRate,
   isOverTarget,
   menuProfitLines,
+  applyOptions,
+  optionLineName,
   suggestedPrice,
   dateInTimeZone,
   daysUntilExpiry,
@@ -472,17 +474,19 @@ describe("menu profit", () => {
   });
 
   it("메뉴별 마진 순위와 분류 (판매량 × 개당 마진)", () => {
-    const menu = (menuId: string, unitCost: number) => ({ menuId, unitCost, costIncomplete: false, noRecipe: false });
+    const menu = (menuId: string) => ({ menuId, costIncomplete: false, noRecipe: false });
+    const sale = (menuId: string, quantity: number, amount: number, unitCost: number) => ({ menuId, quantity, amount, cost: unitCost * quantity });
     const { lines, summary } = menuProfitLines(
-      [menu("아메", 500), menu("라떼", 1500), menu("바닐라", 1800), menu("시즌", 1000), menu("옛메뉴", 500), menu("취소만", 500)],
+      ["아메", "라떼", "바닐라", "시즌", "옛메뉴", "취소만"].map(menu),
       [
-        { menuId: "바닐라", quantity: 10, amount: 55000 },
-        { menuId: "아메", quantity: 100, amount: 400000 },
-        { menuId: "라떼", quantity: 60, amount: 270000 },
-        { menuId: "시즌", quantity: 5, amount: 15000 },
-        { menuId: "옛메뉴", quantity: -1, amount: -4000 }, // 지난 기간 판매의 반품
-        { menuId: "취소만", quantity: 0, amount: 0 }, // 판매 + 취소로 0
-        { menuId: "없는메뉴", quantity: 3, amount: 9000 },
+        sale("바닐라", 10, 55000, 1800),
+        sale("아메", 70, 280000, 500),
+        sale("아메", 30, 120000, 500), // 같은 메뉴의 다른 옵션 묶음 줄은 합친다
+        sale("라떼", 60, 270000, 1500),
+        sale("시즌", 5, 15000, 1000),
+        sale("옛메뉴", -1, -4000, 500), // 지난 기간 판매의 반품
+        sale("취소만", 0, 0, 500), // 판매 + 취소로 0
+        sale("없는메뉴", 3, 9000, 0),
       ],
     );
     expect(lines.map((l) => [l.menuId, l.margin, l.unitMargin, l.class])).toEqual([
@@ -503,6 +507,56 @@ describe("menu profit", () => {
       unitMarginThreshold: 3297, // 577,000 ÷ 175 (반품만 있는 메뉴는 기준에서 뺀다)
     });
     // 판매가 있는 메뉴가 하나뿐이면 분류하지 않는다
-    expect(menuProfitLines([menu("아메", 500)], [{ menuId: "아메", quantity: 3, amount: 12000 }]).lines[0]!.class).toBeNull();
+    expect(menuProfitLines([menu("아메")], [sale("아메", 3, 12000, 500)]).lines[0]!.class).toBeNull();
+  });
+});
+
+describe("menu options", () => {
+  // 원두 18g, 우유 200ml, 컵 1개
+  const latte = [
+    { itemId: "bean", quantity: 18 },
+    { itemId: "milk", quantity: 200 },
+    { itemId: "cup", quantity: 1 },
+  ];
+  const shot = { kind: "add", itemId: "bean", quantity: 18 } as const;
+  const oat = { kind: "replace", itemId: "oat", fromItemId: "milk" } as const;
+  const sizeUp = [
+    { kind: "scale", itemId: "milk", quantity: 1.5 },
+    { kind: "replace", itemId: "cupL", fromItemId: "cup" },
+  ] as const;
+
+  it("추가·바꾸기·늘리기", () => {
+    expect(applyOptions(latte, [shot])).toEqual([
+      { itemId: "bean", quantity: 36 },
+      { itemId: "cup", quantity: 1 },
+      { itemId: "milk", quantity: 200 },
+    ]);
+    // 사이즈업 + 오트밀크: 늘린 뒤 바꾼다 → 오트밀크 300ml, 큰 컵
+    expect(applyOptions(latte, [oat, ...sizeUp])).toEqual([
+      { itemId: "bean", quantity: 18 },
+      { itemId: "cupL", quantity: 1 },
+      { itemId: "oat", quantity: 300 },
+    ]);
+    // 레시피에 없는 재료를 바꾸거나 늘리는 규칙은 아무것도 하지 않는다 (아메리카노 + 오트밀크)
+    const americano = [{ itemId: "bean", quantity: 18 }];
+    expect(applyOptions(americano, [oat, sizeUp[0]])).toEqual(americano);
+  });
+
+  it("바꾸기는 한 번씩만, 같은 재료를 바꾸는 규칙이 여럿이면 하나만", () => {
+    const chain = [
+      { kind: "replace", itemId: "b", fromItemId: "a" },
+      { kind: "replace", itemId: "c", fromItemId: "b" },
+    ] as const;
+    const recipe = [
+      { itemId: "a", quantity: 1 },
+      { itemId: "b", quantity: 2 },
+    ];
+    expect(applyOptions(recipe, [...chain])).toEqual([
+      { itemId: "b", quantity: 1 },
+      { itemId: "c", quantity: 2 },
+    ]);
+    const soy = { kind: "replace", itemId: "soy", fromItemId: "milk" } as const;
+    expect(applyOptions(latte, [soy, oat]).map((r) => r.itemId)).toEqual(["bean", "cup", "oat"]);
+    expect(optionLineName("카페라떼", ["오트밀크 변경", "샷 추가"])).toBe("카페라떼 + 오트밀크 변경 + 샷 추가");
   });
 });

@@ -35,6 +35,7 @@ export function deleteTestUsers(userWhere: string): void {
     delete from public.sale_records where store_id in (select id from e2e_stores);
     delete from public.stock_counts where store_id in (select id from e2e_stores);
     delete from public.purchase_orders where store_id in (select id from e2e_stores);
+    delete from public.menu_options where store_id in (select id from e2e_stores);
     delete from public.menus where store_id in (select id from e2e_stores);
     delete from public.items where store_id in (select id from e2e_stores);
     delete from public.stores where id in (select id from e2e_stores);

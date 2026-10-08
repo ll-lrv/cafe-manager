@@ -147,6 +147,70 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"menu_option_rules": {
+                  Row: {
+                    "created_at": string,"from_item_id": string | null,"id": string,"item_id": string,"kind": Database["public"]['Enums']["option_rule_kind"],"option_id": string,"quantity": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"from_item_id"?: string | null,"id"?: string,"item_id": string,"kind": Database["public"]['Enums']["option_rule_kind"],"option_id": string,"quantity"?: number | null
+                  }
+                  Update: {
+                    "created_at"?: string,"from_item_id"?: string | null,"id"?: string,"item_id"?: string,"kind"?: Database["public"]['Enums']["option_rule_kind"],"option_id"?: string,"quantity"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "menu_option_rules_from_item_id_items_id_fk"
+      columns: ["from_item_id"]
+isOneToOne: false
+      referencedRelation: "item_stock_levels"
+      referencedColumns: ["item_id"]
+    },{
+      foreignKeyName: "menu_option_rules_from_item_id_items_id_fk"
+      columns: ["from_item_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "menu_option_rules_item_id_items_id_fk"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "item_stock_levels"
+      referencedColumns: ["item_id"]
+    },{
+      foreignKeyName: "menu_option_rules_item_id_items_id_fk"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "menu_option_rules_option_id_menu_options_id_fk"
+      columns: ["option_id"]
+isOneToOne: false
+      referencedRelation: "menu_options"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"menu_options": {
+                  Row: {
+                    "archived_at": string | null,"created_at": string,"id": string,"name": string,"price": number,"store_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"created_at"?: string,"id"?: string,"name": string,"price"?: number,"store_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"created_at"?: string,"id"?: string,"name"?: string,"price"?: number,"store_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "menu_options_store_id_stores_id_fk"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"menus": {
                   Row: {
                     "archived_at": string | null,"created_at": string,"external_id": string | null,"id": string,"is_active": boolean,"name": string,"price": number,"store_id": string,"target_cost_rate": number | null,"updated_at": string
@@ -306,6 +370,32 @@ isOneToOne: false
       columns: ["store_id"]
 isOneToOne: false
       referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"sale_record_options": {
+                  Row: {
+                    "option_id": string,"sale_record_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "option_id": string,"sale_record_id": string
+                  }
+                  Update: {
+                    "option_id"?: string,"sale_record_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "sale_record_options_option_id_menu_options_id_fk"
+      columns: ["option_id"]
+isOneToOne: false
+      referencedRelation: "menu_options"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_record_options_sale_record_id_sale_records_id_fk"
+      columns: ["sale_record_id"]
+isOneToOne: false
+      referencedRelation: "sale_records"
       referencedColumns: ["id"]
     }
                   ]
@@ -799,7 +889,7 @@ isOneToOne: false
                            },
 "menu_sales_summary":
 { Args: { "p_from": string,"p_store_id": string,"p_to": string }; Returns: {
-              "amount": number,"menu_id": string,"quantity": number
+              "amount": number,"menu_id": string,"option_ids": (string)[],"quantity": number
             }[]
                            },
 "receive_purchase_order":
@@ -810,6 +900,11 @@ isOneToOne: false
                            },
 "record_stock_movement":
 { Args: { "p_expires_on"?: string,"p_item_id": string,"p_memo"?: string,"p_quantity": number,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id"?: string,"p_unit_price"?: number }; Returns: number
+                           },
+"sale_ingredients":
+{ Args: { "p_menu_id": string,"p_option_ids": (string)[] }; Returns: {
+              "item_id": string,"quantity": number
+            }[]
                            },
 "start_stock_count":
 { Args: { "p_category_id"?: string,"p_memo"?: string,"p_store_id": string }; Returns: string
@@ -824,7 +919,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "base_unit": "g"|"ml"|"ea","member_role": "owner"|"manager"|"staff","movement_type": "receive"|"consume"|"sale"|"waste"|"adjust","purchase_order_status": "draft"|"ordered"|"partially_received"|"received"|"cancelled","sale_source": "manual"|"csv"|"pos","stock_count_status": "in_progress"|"completed"|"cancelled"
+            "base_unit": "g"|"ml"|"ea","member_role": "owner"|"manager"|"staff","movement_type": "receive"|"consume"|"sale"|"waste"|"adjust","option_rule_kind": "scale"|"replace"|"add","purchase_order_status": "draft"|"ordered"|"partially_received"|"received"|"cancelled","sale_source": "manual"|"csv"|"pos","stock_count_status": "in_progress"|"completed"|"cancelled"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -944,7 +1039,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "base_unit": ["g", "ml", "ea"],"member_role": ["owner", "manager", "staff"],"movement_type": ["receive", "consume", "sale", "waste", "adjust"],"purchase_order_status": ["draft", "ordered", "partially_received", "received", "cancelled"],"sale_source": ["manual", "csv", "pos"],"stock_count_status": ["in_progress", "completed", "cancelled"]
+            "base_unit": ["g", "ml", "ea"],"member_role": ["owner", "manager", "staff"],"movement_type": ["receive", "consume", "sale", "waste", "adjust"],"option_rule_kind": ["scale", "replace", "add"],"purchase_order_status": ["draft", "ordered", "partially_received", "received", "cancelled"],"sale_source": ["manual", "csv", "pos"],"stock_count_status": ["in_progress", "completed", "cancelled"]
           }
         }
 } as const

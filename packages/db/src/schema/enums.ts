@@ -32,3 +32,6 @@ export const stockCountStatus = pgEnum("stock_count_status", [
 ]);
 
 export const saleSource = pgEnum("sale_source", ["manual", "csv", "pos"]);
+
+/** 메뉴 옵션 규칙: scale 늘리기(배수), replace 바꾸기, add 추가 */
+export const optionRuleKind = pgEnum("option_rule_kind", ["scale", "replace", "add"]);

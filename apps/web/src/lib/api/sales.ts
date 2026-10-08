@@ -6,12 +6,16 @@ export interface SaleLine {
   menuId: string;
   /** 판매 수량 (1 이상의 정수) */
   quantity: number;
+  /** 붙인 옵션 (같은 메뉴라도 옵션 묶음이 다르면 다른 줄) */
+  optionIds: string[];
 }
 
 export interface Sale {
   id: string;
   menuId: string;
   menuName: string;
+  /** 붙인 옵션 이름 (이름 순) */
+  optionNames: string[];
   quantity: number;
   /** 판매 금액 합계, 원 */
   amount: number;
@@ -35,7 +39,7 @@ export async function recordSales(lines: SaleLine[], soldAt: string | null): Pro
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("record_sales", {
-    p_lines: valid.map((l) => ({ menu_id: l.menuId, quantity: l.quantity })),
+    p_lines: valid.map((l) => ({ menu_id: l.menuId, quantity: l.quantity, option_ids: l.optionIds })),
     p_sold_at: soldAt ?? undefined,
   });
   if (error?.code === "22P02") throw new ApiError("메뉴를 찾을 수 없습니다.");
@@ -51,6 +55,7 @@ type SaleRow = {
   sold_at: string;
   source: "manual" | "csv" | "pos";
   menu: { name: string } | null;
+  options: { option: { name: string } | null }[];
   creator: { display_name: string } | null;
 };
 
@@ -59,7 +64,7 @@ export async function listSales(storeId: string, range: { from: string; to: stri
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sale_records")
-    .select("id, menu_id, quantity, amount, sold_at, source, menu:menus(name), creator:profiles(display_name)")
+    .select("id, menu_id, quantity, amount, sold_at, source, menu:menus(name), options:sale_record_options(option:menu_options(name)), creator:profiles(display_name)")
     .eq("store_id", storeId)
     .gte("sold_at", range.from)
     .lt("sold_at", range.to)
@@ -70,6 +75,7 @@ export async function listSales(storeId: string, range: { from: string; to: stri
     id: s.id,
     menuId: s.menu_id,
     menuName: s.menu?.name ?? "알 수 없는 메뉴",
+    optionNames: s.options.flatMap((o) => (o.option ? [o.option.name] : [])).sort((a, b) => a.localeCompare(b, "ko")),
     quantity: s.quantity,
     amount: s.amount ?? 0,
     soldAt: s.sold_at,

@@ -1,5 +1,5 @@
 import { can, formatQuantity } from "@cafe/core";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Plus, SlidersHorizontal } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -27,12 +27,18 @@ export default async function MenusPage({ searchParams }: PageProps<"/menus">) {
             레시피를 등록하면 판매할 때 재료가 자동으로 차감되고, 최근 입고 단가로 원가를 계산합니다.
           </p>
         </div>
-        {can(store.role, "catalog:manage") && (
-          <Link href="/menus/new" className={buttonVariants()}>
-            <Plus />
-            메뉴 추가
+        <div className="flex gap-2">
+          <Link href="/menus/options" className={buttonVariants({ variant: "outline" })}>
+            <SlidersHorizontal />
+            옵션
           </Link>
-        )}
+          {can(store.role, "catalog:manage") && (
+            <Link href="/menus/new" className={buttonVariants()}>
+              <Plus />
+              메뉴 추가
+            </Link>
+          )}
+        </div>
       </div>
 
       {visible.length === 0 ? (

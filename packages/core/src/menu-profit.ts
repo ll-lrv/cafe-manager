@@ -50,8 +50,6 @@ export const POPULARITY_FACTOR = 0.7;
 
 export interface MenuProfitInput {
   menuId: string;
-  /** 지금 메뉴 1개 원가(원) */
-  unitCost: number;
   /** 입고 단가를 모르는 재료가 있어 원가가 실제보다 낮다 */
   costIncomplete: boolean;
   /** 레시피가 없다 (원가 0원) */
@@ -66,11 +64,17 @@ export interface MenuSalesTotal {
   amount: number;
 }
 
+/** 메뉴(+옵션 묶음)별 판매 합계와 재료비. 한 메뉴가 옵션 묶음마다 여러 줄일 수 있다 */
+export interface MenuSalesCost extends MenuSalesTotal {
+  /** 판매량 × 지금 원가(옵션 반영), 원 */
+  cost: number;
+}
+
 export interface MenuProfitLine {
   menuId: string;
   quantity: number;
   revenue: number;
-  /** 판매량 × 지금 원가 */
+  /** 판매량 × 지금 원가 (옵션 반영) */
   cost: number;
   /** 매출 − 원가 */
   margin: number;
@@ -104,18 +108,26 @@ export interface MenuProfitSummary {
 const rate1 = (cost: number, revenue: number) => (revenue > 0 ? Math.round((cost / revenue) * 1000) / 10 : null);
 
 /**
- * 기간 동안의 메뉴별 매출·원가·마진. 마진이 큰 순.
+ * 기간 동안의 메뉴별 매출·원가·마진. 마진이 큰 순. 옵션 묶음별 줄은 메뉴로 합친다.
  * 판매가 없는 메뉴는 sales 에 없으면 빠진다. 판매량이 0 이하(모두 취소)인 메뉴는 분류하지 않는다.
  */
 export function menuProfitLines(
   menus: MenuProfitInput[],
-  sales: MenuSalesTotal[],
+  sales: MenuSalesCost[],
 ): { lines: MenuProfitLine[]; summary: MenuProfitSummary } {
   const menuById = new Map(menus.map((m) => [m.menuId, m]));
-  const base = sales.flatMap((s) => {
+  const merged = new Map<string, MenuSalesCost>();
+  for (const s of sales) {
+    const prev = merged.get(s.menuId);
+    merged.set(
+      s.menuId,
+      prev ? { ...prev, quantity: prev.quantity + s.quantity, amount: prev.amount + s.amount, cost: prev.cost + s.cost } : { ...s },
+    );
+  }
+  const base = [...merged.values()].flatMap((s) => {
     const menu = menuById.get(s.menuId);
     if (!menu || (s.quantity === 0 && s.amount === 0)) return [];
-    const cost = Math.round(menu.unitCost * s.quantity);
+    const cost = s.cost;
     const margin = s.amount - cost;
     return [{
       menuId: s.menuId,

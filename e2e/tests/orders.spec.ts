@@ -189,6 +189,8 @@ test("거래처·발주·입고 처리", async ({ app }) => {
     );
     // 알림이 화면 갱신보다 조금 먼저 뜰 수 있어 입고 폼이 사라지기를 기다린다.
     await expect(p.getByRole("button", { name: /입고 처리/ })).toHaveCount(0);
+    // 폼이 사라진 뒤에도 상태 표시가 조금 늦게 바뀔 수 있어 글자를 기다린다.
+    await expect(p.locator("main")).toContainText("입고 완료");
     const text = await main(p);
     check("완료 화면: 입고 완료, 입고 폼 없음", text.includes("입고 완료"));
     const lots = sql(

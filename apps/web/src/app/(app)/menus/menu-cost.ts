@@ -1,5 +1,6 @@
-import { costRate, effectiveTargetRate, isOverTarget, recipeCost, suggestedPrice } from "@cafe/core";
+import { applyOptions, costRate, effectiveTargetRate, isOverTarget, recipeCost, suggestedPrice } from "@cafe/core";
 import type { Menu } from "@/lib/api/menus";
+import { toOptionRules, type MenuOption } from "@/lib/api/options";
 
 /**
  * 메뉴 원가·원가율과 목표 원가율 비교. 입고 단가를 모르는 재료가 있으면 missing 에 이름이 담긴다.
@@ -17,6 +18,20 @@ export function menuCost(menu: Pick<Menu, "price" | "recipe" | "targetCostRate">
     overTarget: menu.recipe.length > 0 && isOverTarget(rate, target),
     suggestedPrice: suggestedPrice(cost, target),
   };
+}
+
+/**
+ * 옵션을 붙인 메뉴 1개 원가(원). 옵션이 없으면 메뉴 원가와 같다.
+ * incomplete: 입고 단가를 모르는 재료가 있어 실제보다 낮다
+ */
+export function optionSetCost(
+  menu: Pick<Menu, "recipe">,
+  options: Pick<MenuOption, "rules">[],
+  costs: Record<string, number>,
+): { cost: number; incomplete: boolean } {
+  const recipe = applyOptions(menu.recipe, options.flatMap(toOptionRules));
+  const { cost, missing } = recipeCost(recipe, costs);
+  return { cost, incomplete: missing.length > 0 };
 }
 
 export type OverTargetMenu = ReturnType<typeof menuCost> & { menu: Menu };
