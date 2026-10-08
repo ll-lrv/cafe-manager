@@ -219,8 +219,12 @@ export interface SaleImportRow {
   date: string;
   /** HH:MM:SS. 없으면 그 날 마감 시각으로 기록 */
   time: string | null;
-  /** 파일의 메뉴 이름 (옵션 열이 있으면 "메뉴 / 옵션") */
+  /** 파일의 메뉴 이름 (옵션 열이 있으면 "메뉴 / 옵션"). 행 키에 쓰인다 */
   name: string;
+  /** 메뉴 열 그대로 */
+  menuName: string;
+  /** 옵션 열을 낱말로 나눈 것 (splitOptionNames). 옵션 열이 없으면 빈 배열 */
+  optionNames: string[];
   /** 음수 = 취소·반품 (매출과 재료 차감을 되돌린다) */
   quantity: number;
   /** 원. 금액 열이 없으면 null (메뉴 가격 × 수량). 취소 줄은 0 이하 */
@@ -311,12 +315,96 @@ export function readSaleRows(
       const base = [when.date, when.time ?? "", cell(r, "orderNo"), name, q, a ?? ""].join("|");
       const n = (seen.get(base + keySuffix) ?? 0) + 1;
       seen.set(base + keySuffix, n);
-      rows.push({ line, date: when.date, time: when.time, name, quantity: q, amount: a, key: `${base}#${n}${keySuffix}` });
+      rows.push({
+        line,
+        date: when.date,
+        time: when.time,
+        name,
+        menuName: menu,
+        optionNames: splitOptionNames(option),
+        quantity: q,
+        amount: a,
+        key: `${base}#${n}${keySuffix}`,
+      });
     };
     push(quantity, amount);
     if (cancelledStatus) push(-quantity, amount === null ? null : -amount, "|취소");
   });
   return { rows, issues };
+}
+
+// ---------------------------------------------------------------- 옵션 열
+
+/**
+ * 옵션 열 한 칸을 낱말로 나눈다. 쉼표·슬래시·세로줄·가운뎃점·줄바꿈으로 나누고,
+ * 뒤에 붙은 금액·개수("(+500원)", "(500)", "x1")는 뗀다. 같은 낱말은 한 번만.
+ * 예) "ICE, 샷추가(+500원)" → ["ICE", "샷추가"]
+ */
+export function splitOptionNames(cell: string): string[] {
+  const names = cell
+    .split(/[,/|·\n]+/)
+    .map((t) =>
+      t
+        .replace(/\s*\(\s*[+-]?\s*[\d,]+\s*원?\s*\)\s*$/, "")
+        .replace(/\s*[x×*]\s*\d+\s*$/i, "")
+        .trim(),
+    )
+    .filter((t) => t !== "" && t.length <= 100);
+  return [...new Set(names)];
+}
+
+/** 옵션 열 낱말을 어떻게 볼지: 옵션으로 / 메뉴 이름에 붙임(ICE 처럼 메뉴를 가르는 말) / 무시 */
+export type OptionWordChoice = { kind: "option"; optionId: string } | { kind: "menu" } | { kind: "ignore" };
+
+/**
+ * 낱말마다 저장해 둔 매칭 → 이름이 같은 옵션 순으로 고른다. 못 찾으면 undefined (화면 기본값은 "메뉴 이름에 붙임":
+ * 옵션 기능 전과 같은 동작이라 예전 메뉴 매칭이 그대로 쓰인다).
+ */
+export function matchOptionWords(
+  words: string[],
+  options: { id: string; name: string }[],
+  aliases: Record<string, OptionWordChoice>,
+): Record<string, OptionWordChoice | undefined> {
+  const byName = new Map(options.map((o) => [normalizeMenuName(o.name), o.id]));
+  const optionIds = new Set(options.map((o) => o.id));
+  return Object.fromEntries(
+    words.map((w) => {
+      const alias = aliases[w];
+      // 매칭해 둔 옵션이 지금 목록에 없으면 다시 고르게 한다.
+      if (alias && (alias.kind !== "option" || optionIds.has(alias.optionId))) return [w, alias];
+      const id = byName.get(normalizeMenuName(w));
+      return [w, id ? { kind: "option", optionId: id } : undefined];
+    }),
+  );
+}
+
+/**
+ * 행의 옵션 낱말을 고른 대로 나눈다.
+ * menuKey: 메뉴 매칭에 쓸 이름 — 메뉴 이름 + "메뉴 이름에 붙임" 낱말 ("아메리카노 / ICE"). 붙일 낱말이 없으면 메뉴 이름 그대로
+ * optionIds: 옵션으로 고른 낱말의 옵션 (중복 없이)
+ */
+export function resolveOptionWords(
+  row: Pick<SaleImportRow, "menuName" | "optionNames">,
+  choiceOf: (word: string) => OptionWordChoice,
+): { menuKey: string; optionIds: string[] } {
+  const menuWords: string[] = [];
+  const optionIds = new Set<string>();
+  for (const w of row.optionNames) {
+    const c = choiceOf(w);
+    if (c.kind === "menu") menuWords.push(w);
+    else if (c.kind === "option") optionIds.add(c.optionId);
+  }
+  return {
+    menuKey: menuWords.length > 0 ? `${row.menuName} / ${menuWords.join(", ")}` : row.menuName,
+    optionIds: [...optionIds],
+  };
+}
+
+/** 옵션 열 낱말별 행 수 (많은 순) */
+export function summarizeOptionWords(rows: Pick<SaleImportRow, "optionNames">[]): { name: string; rows: number }[] {
+  const map = new Map<string, number>();
+  for (const r of rows) for (const w of r.optionNames) map.set(w, (map.get(w) ?? 0) + 1);
+  return [...map].map(([name, n]) => ({ name, rows: n })).sort((a, b) => b.rows - a.rows || a.name.localeCompare(b.name, "ko"));
 }
 
 // ---------------------------------------------------------------- 메뉴 매칭

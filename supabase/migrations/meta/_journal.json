@@ -211,6 +211,20 @@
       "when": 1791470030831,
       "tag": "20261008143350_menu_option_rules_check",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791470989109,
+      "tag": "20261008144949_option_aliases",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791470990741,
+      "tag": "20261008144950_import_sales_options",
+      "breakpoints": true
     }
   ]
 }

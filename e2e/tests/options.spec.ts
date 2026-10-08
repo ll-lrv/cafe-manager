@@ -1,7 +1,18 @@
 import type { Page } from "@playwright/test";
 import { sql } from "../db";
 import { expect, MOBILE, test } from "../fixtures";
-import { addIngredient, check, createItem, createMenu, hasHorizontalScroll, idFromUrl, main, recordStock, shot } from "../helpers";
+import {
+  addIngredient,
+  check,
+  createItem,
+  createMenu,
+  hasHorizontalScroll,
+  idFromUrl,
+  kstDate,
+  main,
+  recordStock,
+  shot,
+} from "../helpers";
 
 async function createOption(p: Page, name: string, price: string) {
   await p.goto("/menus/options/new");
@@ -24,6 +35,12 @@ async function addRule(
   if (rule.kind !== "replace") await p.fill("#rule-quantity", rule.quantity);
   await p.getByRole("button", { name: "규칙 넣기" }).click();
   await expect(p.locator("main [data-slot=card]").first().locator("ul")).toContainText(shown);
+}
+
+async function upload(p: Page, name: string, content: string) {
+  await p.goto("/sales/import");
+  await p.getByLabel("판매 파일").setInputFiles({ name, mimeType: "text/csv", buffer: Buffer.from(content, "utf8") });
+  await p.getByText(`${name} ·`).waitFor();
 }
 
 /** 품목별 판매 차감 합계 (기본 단위) */
@@ -186,5 +203,55 @@ test("메뉴 옵션 차감", async ({ app }) => {
     await m.waitForURL(/\/menus\/options\/[0-9a-f-]{36}/);
     check("옵션 상세 가로 스크롤 없음", !(await hasHorizontalScroll(m)));
     await shot(m, "옵션 상세 모바일");
+  });
+
+  await test.step("8. CSV 옵션 열: 옵션으로·메뉴 이름에 붙임·무시", async () => {
+    const before = { bean: soldOf(bean), milk: soldOf(milk), oat: soldOf(oat), cup: soldOf(cup), bigCup: soldOf(bigCup) };
+    const d = kstDate(-1);
+    const csv = [
+      "주문번호,판매일시,상품명,옵션,수량,실판매금액",
+      `B1,${d} 10:00:00,카페라떼,"오트밀크 변경(+600원), ICE",2,"12,000"`,
+      `B2,${d} 10:05:00,카페라떼,사이즈업,1,"5,500"`,
+      `B3,${d} 10:10:00,카페라떼,휘핑,1,"4,500"`,
+      `B4,${d} 10:20:00,카페라떼,사이즈업,-1,"-5,500"`,
+    ].join("\n");
+    await upload(p, "options.csv", csv);
+    // 같은 이름의 옵션은 자동, 모르는 낱말은 "메뉴 이름에 붙임" (옵션 기능 전과 같은 동작)
+    const value = (word: string) => p.getByLabel(`${word} 옵션`, { exact: true }).locator("option:checked").innerText();
+    check("오트밀크 변경 → 옵션 자동", (await value("오트밀크 변경")) === "오트밀크 변경");
+    check("사이즈업 → 옵션 자동", (await value("사이즈업")) === "사이즈업");
+    check("ICE → 메뉴 이름에 붙임", (await value("ICE")) === "메뉴 이름에 붙임");
+    check("휘핑 → 메뉴 이름에 붙임 (기본)", (await value("휘핑")) === "메뉴 이름에 붙임");
+    check("휘핑 붙은 메뉴 이름이 메뉴 단계에", (await p.getByLabel("카페라떼 / 휘핑 메뉴").count()) === 1);
+    await p.getByLabel("휘핑 옵션", { exact: true }).selectOption({ label: "무시" });
+    check("무시하면 메뉴 단계에서 빠짐", (await p.getByLabel("카페라떼 / 휘핑 메뉴").count()) === 0);
+    check("카페라떼 는 메뉴 이름으로 자동", (await p.getByLabel("카페라떼 메뉴", { exact: true }).locator("option:checked").innerText()) === "카페라떼");
+    await p.getByLabel("카페라떼 / ICE 메뉴").selectOption({ label: "카페라떼" });
+    await expect(p.locator("main")).toContainText("옵션 붙은 줄 3");
+    await shot(p, "가져오기 옵션 맞추기");
+    await p.getByRole("button", { name: "4줄 가져오기" }).click();
+    await expect(p.locator("[data-sonner-toast]").filter({ hasText: "4건을 가져왔습니다." }).last()).toBeVisible();
+
+    // B1 오트밀크 2잔: 원두 36·오트밀크 400·컵 2 / B2 사이즈업: 원두 18·우유 300·큰 컵 1 / B3 그대로: 원두 18·우유 200·컵 1 / B4 사이즈업 취소: 되돌림
+    const delta = (id: string, key: keyof typeof before) => Math.round((soldOf(id) - before[key]) * 1000) / 1000;
+    check("원두 −54g", delta(bean, "bean") === -54, delta(bean, "bean"));
+    check("오트밀크 −400ml", delta(oat, "oat") === -400, delta(oat, "oat"));
+    check("우유 −200ml (사이즈업 판매·취소 상계)", delta(milk, "milk") === -200, delta(milk, "milk"));
+    check("컵 −3, 큰 컵 0", delta(cup, "cup") === -3 && delta(bigCup, "bigCup") === 0);
+    check(
+      "DB: 판매 옵션 3줄",
+      sql(`select count(*) from sale_record_options so join sale_records r on r.id = so.sale_record_id where r.source = 'csv' and r.external_id like '%|B%'`) === "3",
+    );
+
+    await p.goto(`/sales?date=${d}`);
+    const text = await main(p);
+    check("판매 목록에 옵션 이름", text.includes("카페라떼 + 오트밀크 변경") && text.includes("카페라떼 + 사이즈업"), text);
+
+    // 같은 파일 다시: 저장한 낱말 매칭(휘핑 무시)·메뉴 매칭이 자동, 이미 가져온 판매는 건너뜀
+    await upload(p, "options.csv", csv);
+    check("휘핑 무시 기억", (await value("휘핑")) === "무시");
+    check("카페라떼 / ICE 기억", (await p.getByLabel("카페라떼 / ICE 메뉴").locator("option:checked").innerText()) === "카페라떼");
+    await p.getByRole("button", { name: "4줄 가져오기" }).click();
+    await expect(p.locator("[data-sonner-toast]").filter({ hasText: "모두 이미 가져왔습니다" }).last()).toBeVisible();
   });
 });

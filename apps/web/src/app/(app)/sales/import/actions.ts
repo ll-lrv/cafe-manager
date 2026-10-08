@@ -1,6 +1,6 @@
 "use server";
 
-import { can, zonedTimeToUtc } from "@cafe/core";
+import { can, zonedTimeToUtc, type OptionWordChoice } from "@cafe/core";
 import { revalidatePath } from "next/cache";
 import { ApiError, toActionError, type ActionState } from "@/lib/api/errors";
 import {
@@ -9,6 +9,7 @@ import {
   IMPORT_CHUNK_SIZE,
   importSaleRows,
   saveMenuAliases,
+  saveOptionAliases,
 } from "@/lib/api/sale-imports";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { isValidDate, storeEndOfDay, storeToday } from "@/lib/inventory";
@@ -38,15 +39,19 @@ export interface ImportRowInput {
   /** HH:MM:SS 또는 null (그 날 마감 시각) */
   time: string | null;
   key: string;
+  /** 옵션 열에서 옵션으로 고른 낱말의 옵션 */
+  optionIds: string[];
 }
 
 /**
- * 가져오기를 시작한다: 메뉴 이름 매칭을 저장하고 가져오기 기록을 만든다.
+ * 가져오기를 시작한다: 메뉴 이름·옵션 낱말 매칭을 저장하고 가져오기 기록을 만든다.
  * aliases: 파일의 메뉴 이름 → 메뉴 id (null 이면 가져오지 않음)
+ * optionAliases: 옵션 열 낱말 → 옵션 / 메뉴 이름에 붙임 / 무시
  */
 export async function startImportAction(
   fileName: string,
   aliases: Record<string, string | null>,
+  optionAliases: Record<string, OptionWordChoice> = {},
 ): Promise<{ error?: string; importId?: string }> {
   try {
     const store = await requireImporter();
@@ -55,7 +60,22 @@ export async function startImportAction(
     if (entries.some(([name, id]) => !name || name.length > 200 || (id !== null && typeof id !== "string"))) {
       throw new ApiError("메뉴 매칭을 확인해 주세요.");
     }
+    const words = Object.entries(optionAliases ?? {});
+    if (words.length > 2000) throw new ApiError("옵션 낱말이 너무 많습니다.");
+    if (
+      words.some(
+        ([w, c]) =>
+          !w ||
+          w.length > 100 ||
+          !c ||
+          !["option", "menu", "ignore"].includes(c.kind) ||
+          (c.kind === "option" && typeof c.optionId !== "string"),
+      )
+    ) {
+      throw new ApiError("옵션 매칭을 확인해 주세요.");
+    }
     await saveMenuAliases(store.storeId, Object.fromEntries(entries));
+    await saveOptionAliases(store.storeId, Object.fromEntries(words));
     return { importId: await createSaleImport(store.storeId, String(fileName ?? "")) };
   } catch (e) {
     return toActionError(e) ?? {};
@@ -90,6 +110,7 @@ export async function importChunkAction(
         amount: r.amount === null ? null : Number(r.amount),
         soldAt,
         externalId: String(r.key),
+        optionIds: Array.isArray(r.optionIds) ? r.optionIds.map(String) : [],
       };
     });
     const inserted = await importSaleRows(String(importId), converted);

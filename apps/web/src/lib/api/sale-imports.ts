@@ -1,4 +1,5 @@
 import "server-only";
+import type { OptionWordChoice } from "@cafe/core";
 import { createClient } from "@/lib/supabase/server";
 import { ApiError, dbErrorMessage } from "./errors";
 import { requireUser } from "./session";
@@ -9,8 +10,10 @@ export const IMPORT_CHUNK_SIZE = 500;
 export interface ImportSaleRow {
   menuId: string;
   quantity: number;
-  /** 원. null 이면 메뉴 가격 × 수량 */
+  /** 원. null 이면 (메뉴 가격 + 옵션 금액) × 수량 */
   amount: number | null;
+  /** 붙인 옵션 (옵션 열에서 옵션으로 고른 낱말) */
+  optionIds: string[];
   /** ISO 시각 */
   soldAt: string;
   /** 같은 행을 두 번 가져오지 않기 위한 키 */
@@ -54,6 +57,35 @@ export async function saveMenuAliases(storeId: string, aliases: Record<string, s
   if (error) throw new ApiError(dbErrorMessage(error));
 }
 
+/** 옵션 열 낱말 → 옵션 / 메뉴 이름에 붙임 / 무시 */
+export async function getOptionAliases(storeId: string): Promise<Record<string, OptionWordChoice>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("option_aliases").select("source_name, kind, option_id").eq("store_id", storeId);
+  if (error) throw new ApiError(dbErrorMessage(error));
+  return Object.fromEntries(
+    data.map((a): [string, OptionWordChoice] => [
+      a.source_name,
+      a.kind === "option" && a.option_id ? { kind: "option", optionId: a.option_id } : { kind: a.kind === "ignore" ? "ignore" : "menu" },
+    ]),
+  );
+}
+
+/** 옵션 열 낱말 매칭을 저장한다 (다음 가져오기 때 자동으로 맞춘다) */
+export async function saveOptionAliases(storeId: string, aliases: Record<string, OptionWordChoice>) {
+  const rows = Object.entries(aliases).map(([sourceName, c]) => ({
+    store_id: storeId,
+    source_name: sourceName,
+    kind: c.kind,
+    option_id: c.kind === "option" ? c.optionId : null,
+  }));
+  if (rows.length === 0) return;
+  const supabase = await createClient();
+  const { error } = await supabase.from("option_aliases").upsert(rows, { onConflict: "store_id,source_name" });
+  if (error?.code === "42501") throw new ApiError("판매 가져오기는 사장과 매니저만 할 수 있습니다.");
+  if (error?.code === "22P02") throw new ApiError("옵션을 찾을 수 없습니다.");
+  if (error) throw new ApiError(dbErrorMessage(error));
+}
+
 /** 가져오기 한 번을 만든다. 판매 행은 importSaleRows 로 나눠 넣는다. */
 export async function createSaleImport(storeId: string, fileName: string): Promise<string> {
   const name = fileName.trim().slice(0, 200) || "판매 파일";
@@ -85,6 +117,7 @@ export async function importSaleRows(importId: string, rows: ImportSaleRow[]): P
       amount: r.amount,
       sold_at: r.soldAt,
       external_id: r.externalId,
+      option_ids: r.optionIds,
     })),
   });
   if (error?.code === "22P02") throw new ApiError("메뉴를 찾을 수 없습니다.");

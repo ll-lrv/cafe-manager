@@ -14,6 +14,10 @@ import {
   parseSaleDateTime,
   readSaleRows,
   summarizeNames,
+  splitOptionNames,
+  matchOptionWords,
+  resolveOptionWords,
+  summarizeOptionWords,
   isNotableCostChange,
   menuCostImpacts,
   effectiveTargetRate,
@@ -558,5 +562,47 @@ describe("menu options", () => {
     const soy = { kind: "replace", itemId: "soy", fromItemId: "milk" } as const;
     expect(applyOptions(latte, [soy, oat]).map((r) => r.itemId)).toEqual(["bean", "cup", "oat"]);
     expect(optionLineName("카페라떼", ["오트밀크 변경", "샷 추가"])).toBe("카페라떼 + 오트밀크 변경 + 샷 추가");
+  });
+});
+
+describe("sales import options", () => {
+  it("옵션 열을 낱말로 나누고 금액·개수를 뗀다", () => {
+    expect(splitOptionNames("ICE, 샷추가(+500원)")).toEqual(["ICE", "샷추가"]);
+    expect(splitOptionNames("L / 오트밀크 변경 (600) | 시럽 x1 · ICE")).toEqual(["L", "오트밀크 변경", "시럽", "ICE"]);
+    expect(splitOptionNames("")).toEqual([]);
+    expect(splitOptionNames("샷추가, 샷추가")).toEqual(["샷추가"]);
+  });
+
+  it("낱말 매칭: 저장한 매칭 → 같은 이름의 옵션, 고른 대로 메뉴 이름과 옵션으로 나눈다", () => {
+    const options = [
+      { id: "o-shot", name: "샷 추가" },
+      { id: "o-oat", name: "오트밀크 변경" },
+    ];
+    const matched = matchOptionWords(["샷추가", "ICE", "오트", "옛옵션", "휘핑"], options, {
+      ICE: { kind: "menu" },
+      오트: { kind: "option", optionId: "o-oat" },
+      옛옵션: { kind: "option", optionId: "archived" },
+      휘핑: { kind: "ignore" },
+    });
+    expect(matched).toEqual({
+      샷추가: { kind: "option", optionId: "o-shot" },
+      ICE: { kind: "menu" },
+      오트: { kind: "option", optionId: "o-oat" },
+      옛옵션: undefined,
+      휘핑: { kind: "ignore" },
+    });
+    const choiceOf = (w: string) => matched[w] ?? { kind: "menu" as const };
+    expect(resolveOptionWords({ menuName: "아메리카노", optionNames: ["ICE", "샷추가", "휘핑"] }, choiceOf)).toEqual({
+      menuKey: "아메리카노 / ICE",
+      optionIds: ["o-shot"],
+    });
+    expect(resolveOptionWords({ menuName: "라떼", optionNames: ["오트", "샷추가"] }, choiceOf)).toEqual({
+      menuKey: "라떼",
+      optionIds: ["o-oat", "o-shot"],
+    });
+    expect(summarizeOptionWords([{ optionNames: ["ICE", "샷추가"] }, { optionNames: ["ICE"] }])).toEqual([
+      { name: "ICE", rows: 2 },
+      { name: "샷추가", rows: 1 },
+    ]);
   });
 });

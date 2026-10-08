@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, index, integer, pgTable, primaryKey, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { archivedAt, createdAt, id, quantity, updatedAt } from "./_shared";
 import { items } from "./catalog";
-import { optionRuleKind } from "./enums";
+import { optionAliasKind, optionRuleKind } from "./enums";
 import { saleRecords } from "./sales";
 import { stores } from "./stores";
 
@@ -77,4 +77,27 @@ export const saleRecordOptions = pgTable(
       .references(() => menuOptions.id, { onDelete: "restrict" }),
   },
   (t) => [primaryKey({ columns: [t.saleRecordId, t.optionId] }), index("sale_record_options_option_idx").on(t.optionId)],
+);
+
+/**
+ * CSV 옵션 열의 낱말(예: "샷추가", "ICE") → 어떻게 볼지. 다음 가져오기 때 자동으로 맞춘다.
+ * kind = option 이면 option_id 의 옵션으로 차감, menu 면 메뉴 이름에 붙여 메뉴 매칭(menu_aliases)에 쓰고, ignore 면 버린다.
+ */
+export const optionAliases = pgTable(
+  "option_aliases",
+  {
+    id: id(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "cascade" }),
+    sourceName: text("source_name").notNull(),
+    kind: optionAliasKind("kind").notNull(),
+    optionId: uuid("option_id").references(() => menuOptions.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("option_aliases_store_name_key").on(t.storeId, t.sourceName),
+    check("option_aliases_source_name_check", sql`length(${t.sourceName}) BETWEEN 1 AND 100`),
+    check("option_aliases_option_check", sql`(${t.kind} = 'option') = (${t.optionId} IS NOT NULL)`),
+  ],
 );

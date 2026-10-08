@@ -102,25 +102,25 @@ A→B, B→C 가 함께 있어도 A 가 C 로 가지 않는다. 같은 재료를
 
 | | |
 |---|---|
-| 마이그레이션 | 지금 내용은 `supabase/migrations/20261008062523_import_sales_refunds.sql` (처음 `..._sale_import_functions.sql`, 취소한 키 건너뛰기 `..._sale_cancel_keys.sql`, 부호 제약 `..._sale_refunds.sql`) (표는 `..._sale_imports.sql`·`..._cancelled_sale_keys.sql`, 합계 뷰는 `..._sale_import_summaries.sql`) |
+| 마이그레이션 | 지금 내용은 `supabase/migrations/20261008144950_import_sales_options.sql` (옵션 전: `..._import_sales_refunds.sql`, 처음 `..._sale_import_functions.sql`, 취소한 키 건너뛰기 `..._sale_cancel_keys.sql`, 부호 제약 `..._sale_refunds.sql`) (표는 `..._sale_imports.sql`·`..._cancelled_sale_keys.sql`, 합계 뷰는 `..._sale_import_summaries.sql`) |
 | 호출하는 곳 | `apps/web/src/lib/api/sale-imports.ts` `importSaleRows()` ← 화면 `/sales/import` 가 500건씩 나눠 부른다 |
 | NestJS 대응 | `SalesService.import()` (예정). `record_sales` 와 같은 차감 로직을 쓴다 |
 | 권한 | 사장·매니저 (`sale:import`, 함수 안에서 `is_store_admin`) |
-| 잠금 | `record_sales` 와 같음 (재료 `items` id 순 `FOR UPDATE`) |
-| 쓰는 테이블 | `sale_records`(`source = 'csv'`, `external_id`, `import_id`), `stock_movements`(`sale`) |
-| core 대응 | 파일 읽기·행 키는 `sales-import.ts` (`readSaleRows`), 차감은 `saleDeductions` |
-| 내부 호출 | `stock_outflow` |
+| 잠금 | `record_sales` 와 같음 (레시피·옵션 규칙 재료 `items` id 순 `FOR UPDATE`) |
+| 쓰는 테이블 | `sale_records`(`source = 'csv'`, `external_id`, `import_id`), `sale_record_options`, `stock_movements`(`sale`) |
+| core 대응 | 파일 읽기·행 키는 `sales-import.ts` (`readSaleRows`, 옵션 열 `splitOptionNames`·`matchOptionWords`·`resolveOptionWords`), 차감은 `applyOptions`·`saleDeductions` |
+| 내부 호출 | `sale_ingredients`, `stock_outflow` |
 
-입력: `p_import_id`(먼저 `sale_imports` 에 한 행을 만든다), `p_rows` = `[{"menu_id", "quantity", "amount"(없으면 가격 × 수량), "sold_at", "external_id"}]` (최대 500건)
+입력: `p_import_id`(먼저 `sale_imports` 에 한 행을 만든다), `p_rows` = `[{"menu_id", "quantity", "amount"(없으면 (가격 + 옵션 금액) × 수량), "sold_at", "external_id", "option_ids"}]` (최대 500건)
 반환: 새로 넣은 판매 건수
 
 처리 순서
 1. 로그인, 가져오기가 있고 그 매장 사장·매니저인지, 행 수
 2. 모든 메뉴가 그 매장 것인지 (보관된 메뉴도 받는다: 지난 판매)
 3. 재료 품목 잠금 (id 순)
-4. 행마다: 수량(0 아님, 절댓값 ≤ 10000)·금액(수량과 같은 부호 또는 0)·판매 시각(미래 불가)·키(1~300자) 검증 → `cancelled_sale_keys` 에 있는 키(판매 화면에서 하나씩 취소한 판매)는 건너뜀 → `sale_records` INSERT **ON CONFLICT DO NOTHING** (`sale_records_external_key` = 매장·source·external_id) → 새로 들어간 행만 재료 처리
-   - 수량 > 0 (판매): 레시피대로 `stock_outflow` 차감
-   - 수량 < 0 (**취소·반품**): 판매를 음수로 기록(매출 상계)하고 레시피 재료를 `sale` 원장 **+** 로 되돌린다 (로트 없이, memo "판매 취소(CSV)"). 이론 vs 실제의 판매 차감량도 원장 합계라 자동으로 상계된다
+4. 행마다: 수량(0 아님, 절댓값 ≤ 10000)·금액(수량과 같은 부호 또는 0)·판매 시각(미래 불가)·키(1~300자)·옵션(같은 매장, 중복 없음, 보관된 옵션도 받음) 검증 → `cancelled_sale_keys` 에 있는 키(판매 화면에서 하나씩 취소한 판매)는 건너뜀 → `sale_records` INSERT **ON CONFLICT DO NOTHING** (`sale_records_external_key` = 매장·source·external_id) → 새로 들어간 행만 재료 처리
+   - 수량 > 0 (판매): `sale_ingredients(메뉴, 옵션)` 대로 `stock_outflow` 차감
+   - 수량 < 0 (**취소·반품**): 판매를 음수로 기록(매출 상계)하고 옵션을 반영한 재료를 `sale` 원장 **+** 로 되돌린다 (로트 없이, memo "판매 취소(CSV)"). 이론 vs 실제의 판매 차감량도 원장 합계라 자동으로 상계된다
 5. 하나라도 실패하면 그 묶음 전체가 취소된다. 앞 묶음은 남지만, 같은 파일을 다시 올리면 키가 같아 남은 것만 들어간다
 
 `external_id` = 파일 내용으로 만든 행 키: `날짜|시각|주문번호|메뉴 이름|수량|금액#같은 내용 몇 번째`. 상태 열이 "취소"인 주문 줄은 화면이 판매 줄(상태를 뺀 같은 키) + 취소 줄(키 끝 `|취소`) 두 행으로 보낸다 → 예전에 "완료"로 가져온 같은 주문은 판매 줄이 건너뛰어지고 취소 줄만 들어가 상계된다. 같은 파일·기간이 겹치는 파일을 다시 올려도 중복되지 않는다. 메뉴 매칭과 상관없는 값이라 매칭을 바꿔도 같다.
@@ -129,6 +129,10 @@ A→B, B→C 가 함께 있어도 A 가 C 로 가지 않는다. 같은 재료를
 **가져오기 취소**는 `sale_imports` 한 행 삭제다 (`cancelSaleImport()`, RLS `sale_imports_delete`). `sale_records.import_id` → 판매 → 원장으로 cascade 된다. 판매 취소와 같은 원장 삭제 예외. 취소한 키는 남기지 않으므로 같은 파일을 다시 올릴 수 있다.
 **가져온 판매 하나만 취소**(판매 화면)하면 트리거가 그 키를 `cancelled_sale_keys`(매장·source·external_id, 정책 없음 = 클라이언트 접근 불가)에 남긴다. 기간이 겹치는 파일을 다시 올려도 취소한 판매(예: 환불)가 되살아나지 않는다. 되돌리려면 판매 화면에서 직접 입력한다.
 메뉴 이름 매칭은 `menu_aliases`(매장·파일의 이름 → 메뉴, null 이면 가져오지 않음)에 직접 upsert 한다 (한 문장, 사장·매니저, 같은 매장 메뉴만).
+**옵션 열**: 화면이 낱말로 나눠(`splitOptionNames`: 쉼표·슬래시 등, "(+500원)" 같은 금액은 뗌) 낱말마다 옵션 / 메뉴 이름에 붙임 / 무시를 고른다.
+고른 것은 `option_aliases`(매장·낱말 → `kind` option·menu·ignore, option 이면 `option_id`)에 같은 방식으로 upsert 한다 (RLS: 사장·매니저, 같은 매장 옵션만).
+"메뉴 이름에 붙임" 낱말은 메뉴 매칭 이름에 붙는다("아메리카노 / ICE" → 아이스 아메리카노). 아무것도 정하지 않은 낱말의 기본값이 이것이라 옵션 기능 전과 같게 동작한다.
+행 키(`external_id`)는 옵션 열 원문을 그대로 쓰므로, 낱말 매칭을 바꿔도 이미 가져온 판매는 다시 들어오지 않는다.
 
 ### `start_stock_count` — 재고 실사 시작
 

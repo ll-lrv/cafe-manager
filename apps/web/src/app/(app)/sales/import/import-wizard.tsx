@@ -6,12 +6,16 @@ import {
   guessColumns,
   IMPORT_FIELDS,
   matchMenus,
+  matchOptionWords,
   parseCsv,
   readSaleRows,
+  resolveOptionWords,
   SALE_IMPORT_MAX_ROWS,
   summarizeNames,
+  summarizeOptionWords,
   type ImportColumns,
   type ImportField,
+  type OptionWordChoice,
 } from "@cafe/core";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -28,6 +32,12 @@ const CHUNK = 500;
 /** 메뉴를 고르지 않은 상태 / 가져오지 않음 */
 const UNSET = "";
 const SKIP = "skip";
+/** 옵션 낱말 고르기 값: 메뉴 이름에 붙임 / 무시 / "option:<id>" */
+const WORD_MENU = "menu";
+const WORD_IGNORE = "ignore";
+const wordValue = (c: OptionWordChoice) => (c.kind === "option" ? `option:${c.optionId}` : c.kind);
+const wordChoice = (v: string): OptionWordChoice =>
+  v.startsWith("option:") ? { kind: "option", optionId: v.slice(7) } : { kind: v === WORD_IGNORE ? "ignore" : "menu" };
 
 interface LoadedFile {
   name: string;
@@ -40,11 +50,17 @@ const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 export function SalesImportWizard({
   menus,
   aliases,
+  options,
+  optionAliases,
   today,
 }: {
   menus: { id: string; name: string; price: number }[];
   /** 저장해 둔 메뉴 이름 매칭 */
   aliases: Record<string, string | null>;
+  /** 판매 중인 옵션 */
+  options: { id: string; name: string; price: number }[];
+  /** 저장해 둔 옵션 열 낱말 매칭 */
+  optionAliases: Record<string, OptionWordChoice>;
   /** 매장 시간대 기준 오늘 YYYY-MM-DD */
   today: string;
 }) {
@@ -53,6 +69,8 @@ export function SalesImportWizard({
   const [columns, setColumns] = useState<ImportColumns>({});
   /** 사용자가 고른 매칭 (파일 이름 → 메뉴 id, SKIP, UNSET) */
   const [choices, setChoices] = useState<Record<string, string>>({});
+  /** 사용자가 고른 옵션 낱말 매칭 (낱말 → wordValue) */
+  const [wordChoices, setWordChoices] = useState<Record<string, string>>({});
   const [progress, setProgress] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [inputKey, setInputKey] = useState(0);
@@ -65,7 +83,27 @@ export function SalesImportWizard({
   const missingColumns = IMPORT_FIELDS.filter((f) => f.required && columns[f.field] === undefined);
   // 미래 날짜는 가져올 수 없다
   const futureCount = parsed.rows.filter((r) => r.date > today).length;
-  const rows = useMemo(() => parsed.rows.filter((r) => r.date <= today), [parsed, today]);
+  const fileRows = useMemo(() => parsed.rows.filter((r) => r.date <= today), [parsed, today]);
+
+  // 옵션 열 낱말: 저장한 매칭 → 같은 이름의 옵션 → 기본은 "메뉴 이름에 붙임" (옵션 기능 전과 같은 동작)
+  const words = useMemo(() => summarizeOptionWords(fileRows), [fileRows]);
+  const autoWords = useMemo(
+    () => matchOptionWords(words.map((w) => w.name), options, optionAliases),
+    [words, options, optionAliases],
+  );
+  const wordValueOf = (word: string): string =>
+    word in wordChoices ? wordChoices[word]! : wordValue(autoWords[word] ?? { kind: "menu" });
+  // 행마다 메뉴 매칭 이름(메뉴 + 메뉴 이름에 붙인 낱말)과 옵션
+  const rows = useMemo(
+    () =>
+      fileRows.map((r) => {
+        const { menuKey, optionIds } = resolveOptionWords(r, (w) =>
+          wordChoice(w in wordChoices ? wordChoices[w]! : wordValue(autoWords[w] ?? { kind: "menu" })),
+        );
+        return { ...r, name: menuKey, optionIds };
+      }),
+    [fileRows, wordChoices, autoWords],
+  );
   const names = useMemo(() => summarizeNames(rows), [rows]);
   const autoMatch = useMemo(
     () =>
@@ -83,9 +121,12 @@ export function SalesImportWizard({
   };
   const unmatched = names.filter((n) => choiceOf(n.name) === UNSET);
   const toImport = rows.filter((r) => ![UNSET, SKIP].includes(choiceOf(r.name)));
-  const priceOf = new Map(menus.map((m) => [m.id, m.price]));
+  const priceOf = new Map([...menus, ...options].map((m) => [m.id, m.price]));
   const totalQuantity = toImport.reduce((sum, r) => sum + r.quantity, 0);
-  const totalAmount = toImport.reduce((sum, r) => sum + (r.amount ?? (priceOf.get(choiceOf(r.name)) ?? 0) * r.quantity), 0);
+  const unitPriceOf = (r: (typeof rows)[number]) =>
+    (priceOf.get(choiceOf(r.name)) ?? 0) + r.optionIds.reduce((sum, id) => sum + (priceOf.get(id) ?? 0), 0);
+  const totalAmount = toImport.reduce((sum, r) => sum + (r.amount ?? unitPriceOf(r) * r.quantity), 0);
+  const withOptions = toImport.filter((r) => r.optionIds.length > 0).length;
   const dates = toImport.map((r) => r.date).sort();
   const refundCount = rows.filter((r) => r.quantity < 0).length;
   const importRefunds = toImport.filter((r) => r.quantity < 0).length;
@@ -102,6 +143,7 @@ export function SalesImportWizard({
       setFile({ name: f.name, table, headerIndex });
       setColumns(guessColumns(table[headerIndex] ?? []));
       setChoices({});
+      setWordChoices({});
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "파일을 읽을 수 없습니다. CSV 파일인지 확인해 주세요.");
     }
@@ -111,6 +153,7 @@ export function SalesImportWizard({
     setFile(null);
     setColumns({});
     setChoices({});
+    setWordChoices({});
     setInputKey((k) => k + 1);
   }
 
@@ -120,7 +163,8 @@ export function SalesImportWizard({
       const aliasMap = Object.fromEntries(
         names.map((n) => [n.name, choiceOf(n.name) === SKIP ? null : choiceOf(n.name)] as const),
       );
-      const started = await startImportAction(file.name, aliasMap);
+      const wordMap = Object.fromEntries(words.map((w) => [w.name, wordChoice(wordValueOf(w.name))] as const));
+      const started = await startImportAction(file.name, aliasMap, wordMap);
       if (!started.importId) {
         toast.error(started.error ?? "가져오기를 시작하지 못했습니다.");
         return;
@@ -132,6 +176,7 @@ export function SalesImportWizard({
         date: r.date,
         time: r.time,
         key: r.key,
+        optionIds: r.optionIds,
       }));
       let inserted = 0;
       for (let i = 0; i < payload.length; i += CHUNK) {
@@ -302,10 +347,64 @@ export function SalesImportWizard({
         </Card>
       )}
 
+      {file && missingColumns.length === 0 && words.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>3. 옵션 맞추기</CardTitle>
+            <CardDescription>
+              옵션 열의 낱말마다 어떻게 볼지 골라 주세요. 옵션을 고르면 그 옵션의 재료 규칙대로 차감합니다. ICE·HOT 처럼 메뉴를
+              가르는 말은 &quot;메뉴 이름에 붙임&quot; (다음 단계에서 &quot;아메리카노 / ICE&quot; 를 메뉴와 맞춥니다), 재료와
+              상관없는 것은 &quot;무시&quot;. 고른 것은 저장해 두고 다음에 자동으로 맞춥니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y">
+              {words.map((w) => {
+                const value = wordValueOf(w.name);
+                const auto = !(w.name in wordChoices) && autoWords[w.name] !== undefined;
+                return (
+                  <li key={w.name} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2">
+                    <div className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="text-sm font-medium break-all">{w.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {w.rows.toLocaleString("ko-KR")}줄{auto && " · 자동으로 맞춤"}
+                      </span>
+                    </div>
+                    <NativeSelect
+                      aria-label={`${w.name} 옵션`}
+                      value={value}
+                      onChange={(e) => setWordChoices((c) => ({ ...c, [w.name]: e.target.value }))}
+                      disabled={pending}
+                    >
+                      <option value={WORD_MENU}>메뉴 이름에 붙임</option>
+                      <option value={WORD_IGNORE}>무시</option>
+                      {options.length > 0 && (
+                        <optgroup label="옵션">
+                          {options.map((o) => (
+                            <option key={o.id} value={`option:${o.id}`}>
+                              {o.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </NativeSelect>
+                  </li>
+                );
+              })}
+            </ul>
+            {options.length === 0 && (
+              <p className="pt-2 text-xs text-muted-foreground">
+                등록한 옵션이 없습니다. 샷 추가처럼 재료가 바뀌는 옵션은 메뉴 → 옵션에서 먼저 만들어 주세요.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {file && missingColumns.length === 0 && names.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>3. 메뉴 맞추기</CardTitle>
+            <CardTitle>{words.length > 0 ? 4 : 3}. 메뉴 맞추기</CardTitle>
             <CardDescription>
               파일의 메뉴 이름마다 등록한 메뉴를 골라 주세요. 쿠폰처럼 재고와 상관없는 것은 &quot;가져오지 않음&quot;.
               고른 것은 저장해 두고 다음에 자동으로 맞춥니다.
@@ -354,6 +453,9 @@ export function SalesImportWizard({
                     {importRefunds > 0 && ` (취소 ${importRefunds.toLocaleString("ko-KR")}줄)`} · {totalQuantity.toLocaleString("ko-KR")}개 ·{" "}
                     {won(totalAmount)}
                   </span>
+                  {withOptions > 0 && (
+                    <span className="text-muted-foreground"> · 옵션 붙은 줄 {withOptions.toLocaleString("ko-KR")}</span>
+                  )}
                   <span className="text-muted-foreground">
                     {" "}
                     ({dates[0] === dates.at(-1) ? dates[0] : `${dates[0]} ~ ${dates.at(-1)}`})

@@ -231,6 +231,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"option_aliases": {
+                  Row: {
+                    "created_at": string,"id": string,"kind": Database["public"]['Enums']["option_alias_kind"],"option_id": string | null,"source_name": string,"store_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"kind": Database["public"]['Enums']["option_alias_kind"],"option_id"?: string | null,"source_name": string,"store_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"kind"?: Database["public"]['Enums']["option_alias_kind"],"option_id"?: string | null,"source_name"?: string,"store_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "option_aliases_option_id_menu_options_id_fk"
+      columns: ["option_id"]
+isOneToOne: false
+      referencedRelation: "menu_options"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "option_aliases_store_id_stores_id_fk"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"display_name": string,"id": string
@@ -919,7 +945,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "base_unit": "g"|"ml"|"ea","member_role": "owner"|"manager"|"staff","movement_type": "receive"|"consume"|"sale"|"waste"|"adjust","option_rule_kind": "scale"|"replace"|"add","purchase_order_status": "draft"|"ordered"|"partially_received"|"received"|"cancelled","sale_source": "manual"|"csv"|"pos","stock_count_status": "in_progress"|"completed"|"cancelled"
+            "base_unit": "g"|"ml"|"ea","member_role": "owner"|"manager"|"staff","movement_type": "receive"|"consume"|"sale"|"waste"|"adjust","option_alias_kind": "option"|"menu"|"ignore","option_rule_kind": "scale"|"replace"|"add","purchase_order_status": "draft"|"ordered"|"partially_received"|"received"|"cancelled","sale_source": "manual"|"csv"|"pos","stock_count_status": "in_progress"|"completed"|"cancelled"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1039,7 +1065,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "base_unit": ["g", "ml", "ea"],"member_role": ["owner", "manager", "staff"],"movement_type": ["receive", "consume", "sale", "waste", "adjust"],"option_rule_kind": ["scale", "replace", "add"],"purchase_order_status": ["draft", "ordered", "partially_received", "received", "cancelled"],"sale_source": ["manual", "csv", "pos"],"stock_count_status": ["in_progress", "completed", "cancelled"]
+            "base_unit": ["g", "ml", "ea"],"member_role": ["owner", "manager", "staff"],"movement_type": ["receive", "consume", "sale", "waste", "adjust"],"option_alias_kind": ["option", "menu", "ignore"],"option_rule_kind": ["scale", "replace", "add"],"purchase_order_status": ["draft", "ordered", "partially_received", "received", "cancelled"],"sale_source": ["manual", "csv", "pos"],"stock_count_status": ["in_progress", "completed", "cancelled"]
           }
         }
 } as const

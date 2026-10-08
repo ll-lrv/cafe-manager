@@ -35,3 +35,6 @@ export const saleSource = pgEnum("sale_source", ["manual", "csv", "pos"]);
 
 /** 메뉴 옵션 규칙: scale 늘리기(배수), replace 바꾸기, add 추가 */
 export const optionRuleKind = pgEnum("option_rule_kind", ["scale", "replace", "add"]);
+
+/** CSV 옵션 열의 낱말을 어떻게 볼지: option 옵션으로, menu 메뉴 이름에 붙임(ICE 처럼 메뉴를 가르는 말), ignore 무시 */
+export const optionAliasKind = pgEnum("option_alias_kind", ["option", "menu", "ignore"]);
