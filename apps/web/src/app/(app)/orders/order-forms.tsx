@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE_UNIT_LABEL, formatQuantity, orderTotal, roundQty, type PurchaseOrderStatus } from "@cafe/core";
+import { BASE_UNIT_LABEL, formatQuantity, formatUnitCount, orderTotal, roundQty, type PurchaseOrderStatus } from "@cafe/core";
 import { Check, Copy, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ function WonInput(props: React.ComponentProps<typeof Input>) {
 
 /** "3봉", "500g" 처럼 주문 단위로 표시 */
 function orderQty(line: Pick<OrderLine, "unitName" | "baseUnit">, quantity: number) {
-  return `${roundQty(quantity).toLocaleString("ko-KR")}${line.unitName ?? BASE_UNIT_LABEL[line.baseUnit]}`;
+  return formatUnitCount(quantity, line.unitName ?? BASE_UNIT_LABEL[line.baseUnit]);
 }
 
 // ---------------------------------------------------------------- 새 발주

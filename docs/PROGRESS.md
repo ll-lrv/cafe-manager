@@ -2,7 +2,7 @@
 
 > 프로젝트 전체 요약과 인수인계는 `docs/HANDOVER.md` 를 먼저 본다.
 
-마지막 업데이트: 2026-10-07
+마지막 업데이트: 2026-10-08
 
 ## 지금까지 한 것
 
@@ -120,6 +120,11 @@
   - 예전 저장소는 `cafe-manager_v1` (이름이 `cafe-manager` 에서 바뀐 것). 새 저장소가 옛 이름을 쓰면 리디렉트가 끊겨, `C:\project\cafe-manager_v1` 의 origin 을 `.../cafe-manager_v1.git` 로 바꿈
 - CI(`.github/workflows/ci.yml`): 타입·lint·단위 테스트 / Supabase 를 띄워 마이그레이션 적용 후 E2E (2 workers). 첫 실행부터 둘 다 통과 (E2E 8개 3.4분)
 - Actions 를 Node 24 버전으로 올림 (checkout v7, setup-node v7, pnpm/action-setup v6, upload-artifact v7, supabase/setup-cli v3). 메이저 변경 내역 확인 후 올렸고 다시 통과
+
+### 10. 수량 표시 수정 (2026-10-08)
+- 단위 이름이 숫자로 시작하면("1L 팩", "50개 묶음") 수량과 붙어 "11L 팩", "250개 묶음" 처럼 읽히던 문제
+- core `formatUnitCount`(예: "2봉", "2 × 1L 팩"), `oneUnitLabel`(예: "1봉", "1L 팩") 추가. `formatQuantity`, 발주 수량·카카오톡 복사, 입고 단위 목록, 입고 단가 칸 이름에 적용 (테스트 24개)
+- 확인: 화면 확인 + 전체 E2E 8개 통과
 
 ## 다시 시작하는 방법
 

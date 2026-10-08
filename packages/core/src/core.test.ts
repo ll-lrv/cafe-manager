@@ -11,6 +11,8 @@ import {
   isValidTimeZone,
   derivePurchaseOrderStatus,
   formatQuantity,
+  formatUnitCount,
+  oneUnitLabel,
   fromBaseQuantity,
   mergeDeltas,
   orderTotal,
@@ -43,6 +45,18 @@ describe("units", () => {
     expect(formatQuantity(2000, "g", bag)).toBe("2봉");
     expect(formatQuantity(350, "g", bag)).toBe("350g");
     expect(formatQuantity(12, "ea")).toBe("12개");
+  });
+
+  it("숫자로 시작하는 단위 이름은 수량과 나눠 쓴다", () => {
+    const pack = { id: "u2", name: "1L 팩", factor: 1000 };
+    const bundle = { id: "u3", name: "50개 묶음", factor: 50 };
+    expect(formatQuantity(1000, "ml", pack)).toBe("1 × 1L 팩");
+    expect(formatQuantity(2500, "ml", pack)).toBe("2 × 1L 팩 + 500ml");
+    expect(formatQuantity(135, "ea", bundle)).toBe("2 × 50개 묶음 + 35개");
+    expect(formatUnitCount(1.5, "봉")).toBe("1.5봉");
+    expect(formatUnitCount(3, "1kg 봉")).toBe("3 × 1kg 봉");
+    expect(oneUnitLabel("봉")).toBe("1봉");
+    expect(oneUnitLabel("1L 팩")).toBe("1L 팩");
   });
 
   it("부동소수 오차를 없앤다", () => {

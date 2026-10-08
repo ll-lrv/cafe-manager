@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE_UNIT_LABEL, formatQuantity, type BaseUnit } from "@cafe/core";
+import { BASE_UNIT_LABEL, formatQuantity, oneUnitLabel, type BaseUnit } from "@cafe/core";
 import { Archive, ArchiveRestore, Star, Trash2 } from "lucide-react";
 import { useActionState, useState } from "react";
 import {
@@ -233,7 +233,7 @@ function UnitRow({ itemId, unit, baseUnit, readOnly }: {
 
   return (
     <li className="flex flex-wrap items-center gap-2 py-2.5">
-      <span className="text-sm font-medium">1{unit.name}</span>
+      <span className="text-sm font-medium">{oneUnitLabel(unit.name)}</span>
       <span className="text-sm text-muted-foreground">= {formatQuantity(unit.factor, baseUnit)}</span>
       {unit.isDefaultPurchase && <Badge>기본 입고 단위</Badge>}
       {!readOnly && (

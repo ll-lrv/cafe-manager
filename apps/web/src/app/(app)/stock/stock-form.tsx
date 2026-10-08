@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE_UNIT_LABEL, formatQuantity, roundQty } from "@cafe/core";
+import { BASE_UNIT_LABEL, formatQuantity, oneUnitLabel, roundQty } from "@cafe/core";
 import { useState } from "react";
 import { Field, FormMessage, NativeSelect, SubmitButton, useFormAction, useToastResult } from "@/components/form-parts";
 import { Input } from "@/components/ui/input";
@@ -200,7 +200,7 @@ export function StockForm({ items, stock, canAdjust, initialItemId }: {
       </div>
 
       {type === "receive" && (
-        <Field label={`단가 (1${unitName}당, 선택)`} htmlFor="stock-price" hint="원가 계산에 쓰입니다.">
+        <Field label={`단가 (${oneUnitLabel(unitName)}당, 선택)`} htmlFor="stock-price" hint="원가 계산에 쓰입니다.">
           <div className="relative">
             <Input
               id="stock-price"
