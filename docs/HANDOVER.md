@@ -1,6 +1,6 @@
 # 인수인계 문서 — cafe-manager
 
-작성일: 2026-10-06 · 최종 갱신: 2026-10-08 · 기준 커밋: `acc6c58` (main)
+작성일: 2026-10-06 · 최종 갱신: 2026-10-08 · 기준 커밋: `c9fc151` (main)
 
 이 문서 하나로 프로젝트를 이어받을 수 있게 정리했다. 세부 기록은 아래 문서에 있다.
 
@@ -15,17 +15,17 @@
 
 ## 1. 한눈에 보기
 
-카페 운영 관리 앱. **재고관리 MVP는 끝났고, 유료화를 위한 기능(카페 기본 템플릿, 이론 vs 실제 리포트)을 붙이는 중이다.** 배포는 아직 안 했다.
+카페 운영 관리 앱. **재고관리 MVP는 끝났고, 유료화를 위한 기능(카페 기본 템플릿, 이론 vs 실제 리포트, 단가 알림, CSV 판매 가져오기)을 붙이는 중이다.** 배포는 아직 안 했다.
 
 | 항목 | 상태 |
 |---|---|
-| 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기** |
+| 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기(취소·반품 반영)** |
 | 저장소 | https://github.com/ll-lrv/cafe-manager (**공개**) |
-| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 최근 실행(`89794a1`) 모두 통과 |
-| 테스트 | core 단위 37개, 브라우저 E2E 12개 시나리오 (로컬 통과) |
+| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 최근 실행(`c9fc151`) 결과는 §10 "완료된 것" 참고 |
+| 테스트 | core 단위 38개, 브라우저 E2E 12개 시나리오 (로컬 전체 통과, 2026-10-08) |
 | 배포 | **아직 없음.** 로컬 Supabase(Docker)에서만 동작. 후보: Supabase 클라우드(서울) + Vercel (§10) |
 | 로컬 DB | 2026-10-07 에 비운 뒤 **데모 계정 하나**를 만들어 둠: `demo-owner@cafe.kr` / `test1234` ("데모 카페", 품목 3·메뉴 2·판매 65잔). 실사 기록은 없다 |
-| 다음 | 메뉴 수익성 순위 → 배포·시범 매장 (§10) |
+| 다음 | 메뉴 수익성 순위 + 권장 판매가 → 옵션 차감 → 소진 예상일·추천 발주. 배포·시범 매장은 이보다 먼저 하기를 권장 (사용자 결정, §10) |
 
 ---
 
@@ -92,6 +92,7 @@ pnpm dev                   # http://localhost:3000
 - 이 저장소의 `user.email` 은 `88585381+ll-lrv@users.noreply.github.com` 로 설정돼 있다 (로컬 git 설정). 다른 PC에서 받으면 같은 주소로 설정한다
 - 예전 저장소는 `ll-lrv/cafe-manager_v1` (이름이 `cafe-manager` 에서 바뀐 것). `C:\project\cafe-manager_v1` 폴더의 origin 은 `.../cafe-manager_v1.git` 로 바꿔 두었다
 - 작업 방식(2026-10-08~): 기능마다 브랜치(`fix/...`, `feat/...`)에서 커밋 → `main` 에 fast-forward merge → push → 브랜치 삭제 → CI 결과 확인. 커밋·push 는 사용자가 요청할 때만 한다
+- AI 세션 두 개를 동시에 돌릴 때는 **세션마다 작업 폴더(git worktree)를 따로** 쓴다. 2026-10-08 에 두 세션이 같은 폴더에서 CSV 가져오기를 동시에 고쳐 `import_sales` 가 서로 덮어써졌다 (한쪽이 합쳐서 해결)
 - `.github/workflows/` 를 바꿔 push 하려면 GitHub 토큰에 `workflow` 권한이 필요하다 (`gh auth refresh -h github.com -s workflow`, 이 PC는 설정됨)
 
 ---
@@ -110,7 +111,7 @@ apps/web                Next.js 16 (App Router)
 packages/core           순수 TS 비즈니스 로직 + 단위 테스트 (DB·프레임워크 의존 금지)
 packages/db             Drizzle 스키마 (스키마 변경은 반드시 여기서)
 supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (17개)
-e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 10개
+e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 12개
 .github/workflows/ci.yml  CI (타입·lint·단위 테스트, Supabase + E2E)
 docs/                   이 문서, PROGRESS, db-functions
 ```
@@ -291,7 +292,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 | 종류 | 상태 |
 |---|---|
-| core 단위 테스트 (vitest) | 37개, `pnpm test` |
+| core 단위 테스트 (vitest) | 38개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`(web·core·db·e2e), `pnpm lint`(web: Next 규칙, core·db: `typescript-eslint` 권장) 통과 |
 | DB 함수·정책 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
 | 브라우저 E2E | `e2e/tests/` 12개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동. 로컬 약 3~6분(3개 병렬), CI 약 5분 |
@@ -406,6 +407,8 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-08 | `89794a1` | 이론 vs 실제 리포트(AvT) `/reports`, `stock_usage_summary`, core `avt.ts` |
 | 10-08 | `7a3f83c` | 입고 단가 변동 알림: `item_cost_changes` 뷰, core `cost-changes.ts`, 입고 직후 알림·대시보드 카드·품목 상세 |
 | 10-08 | `acc6c58` | CSV 판매 가져오기 `/sales/import`: `import_sales`, `sale_imports`·`menu_aliases`, core `sales-import.ts` |
+| 10-08 | `3223b3b` | 경쟁사 2차 조사 결과를 로드맵에 반영 (§10-0 꼭 필요한 기능 3개, §10-9 보류한 아이디어) |
+| 10-08 | `c9fc151` | CSV 취소·반품 줄 = 음수 판매(재료 되돌림), 가져온 판매 개별 취소의 실시간 반영·재가져오기 방지(`cancelled_sale_keys`) |
 
 ---
 
