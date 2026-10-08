@@ -21,11 +21,11 @@
 |---|---|
 | 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기(취소·반품 반영) → 메뉴 수익성 순위·목표 원가율(권장 판매가, 목표 넘음 알림) → 메뉴 옵션 차감(판매 입력·CSV 옵션 열)** |
 | 저장소 | https://github.com/ll-lrv/cafe-manager (**공개**) |
-| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 최근 실행(`c9fc151`) 결과는 §10 "완료된 것" 참고 |
-| 테스트 | core 단위 44개, 브라우저 E2E 14개 시나리오 (로컬 전체 통과, 2026-10-08) |
+| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 2026-10-08~09 push(`f9ca606`, `baf47a1`, `09f59bc`) 모두 통과 (타입·lint·단위 + E2E 14개) |
+| 테스트 | core 단위 44개, 브라우저 E2E 14개 시나리오 (로컬 전체 통과, 2026-10-09) |
 | 배포 | **아직 없음.** 로컬 Supabase(Docker)에서만 동작. 후보: Supabase 클라우드(서울) + Vercel (§10) |
 | 로컬 DB | 2026-10-07 에 비운 뒤 **데모 계정 하나**를 만들어 둠: `demo-owner@cafe.kr` / `test1234` ("데모 카페", 품목 3·메뉴 2·판매 65잔). 실사 기록은 없다 |
-| 다음 | 소진 예상일·추천 발주 → 폐기 사유. 배포·시범 매장은 이보다 먼저 하기를 권장 (사용자 결정, §10) |
+| 다음 | **소진 예상일·판매량 기반 추천 발주** (§10-0) → 폐기 사유·폐기율. 배포·시범 매장은 이보다 먼저 하기를 권장 (사용자 결정, §10) |
 
 ---
 
@@ -63,7 +63,7 @@ npx supabase start -x imgproxy,edge-runtime,logflare,vector,supavisor
 npx supabase status        # Publishable key 를 .env.local 의 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 에
 pnpm dev                   # http://localhost:3000
 ```
-- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 17개가 모두 적용된다.
+- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 32개가 모두 적용된다.
 - DB 보기: Supabase Studio http://127.0.0.1:55323 · 메일함(Mailpit) http://127.0.0.1:55324
 
 ### 이어서 작업할 때
@@ -91,7 +91,8 @@ pnpm dev                   # http://localhost:3000
 - `main` 에 push 하면 CI 가 돈다. 결과: 저장소 Actions 탭 또는 `gh run list -R ll-lrv/cafe-manager`
 - 이 저장소의 `user.email` 은 `88585381+ll-lrv@users.noreply.github.com` 로 설정돼 있다 (로컬 git 설정). 다른 PC에서 받으면 같은 주소로 설정한다
 - 예전 저장소는 `ll-lrv/cafe-manager_v1` (이름이 `cafe-manager` 에서 바뀐 것). `C:\project\cafe-manager_v1` 폴더의 origin 은 `.../cafe-manager_v1.git` 로 바꿔 두었다
-- 작업 방식(2026-10-08~): 기능마다 브랜치(`fix/...`, `feat/...`)에서 커밋 → `main` 에 fast-forward merge → push → 브랜치 삭제 → CI 결과 확인. 커밋·push 는 사용자가 요청할 때만 한다
+- 작업 방식(2026-10-08~): 기능마다 브랜치(`fix/...`, `feat/...`)에서 커밋 → `main` 에 fast-forward merge → push → 브랜치 삭제 → CI 결과 확인. push 는 사용자가 요청할 때만 한다
+  - 2026-10-08~09 세션(메뉴 수익성·옵션)은 `main` 에 바로 커밋하고, 사용자가 "push 하고 진행"을 요청해 기능마다 push 했다. 커밋 메시지 끝의 `Co-Authored-By` 줄은 AI 도우미가 붙인 것
 - AI 세션 두 개를 동시에 돌릴 때는 **세션마다 작업 폴더(git worktree)를 따로** 쓴다. 2026-10-08 에 두 세션이 같은 폴더에서 CSV 가져오기를 동시에 고쳐 `import_sales` 가 서로 덮어써졌다 (한쪽이 합쳐서 해결)
 - `.github/workflows/` 를 바꿔 push 하려면 GitHub 토큰에 `workflow` 권한이 필요하다 (`gh auth refresh -h github.com -s workflow`, 이 PC는 설정됨)
 
@@ -103,9 +104,12 @@ pnpm dev                   # http://localhost:3000
 apps/web                Next.js 16 (App Router)
   src/app/(app)/...     로그인 후 화면 (공통 레이아웃: 메뉴·실시간 새로고침)
   src/app/login, onboarding, invite/[token]
-  src/lib/api/*         데이터 접근 (server-only). NestJS 전환 시 여기만 바꾼다 (templates.ts 기본 템플릿, reports.ts 리포트 집계 포함)
+  src/lib/api/*         데이터 접근 (server-only). NestJS 전환 시 여기만 바꾼다 (templates.ts 기본 템플릿, reports.ts 리포트 집계, options.ts 메뉴 옵션 포함)
   src/lib/api/realtime.ts  브라우저용 실시간 구독 (예외적으로 클라이언트에서 사용)
   src/lib/inventory.ts, order-suggestions.ts  화면용 계산 (매장 시간대의 오늘·하루 범위, 재고 상태, 발주 추천)
+  src/lib/cost-alerts.ts, cost-notice.ts  단가 변동 알림 (목표 원가율 넘음 표시 포함), option-text.ts 옵션 규칙 문구
+  src/app/(app)/menus/menu-cost.ts  메뉴 원가·목표 원가율·목표 맞추는 판매가·옵션 묶음 원가 (메뉴·대시보드·리포트가 함께 씀)
+  src/app/(app)/reports/periods.ts, report-parts.tsx  리포트 기간 고르기·탭 (두 리포트가 함께 씀)
   src/components/form-parts.tsx  폼 공용 부품 (§8)
   src/proxy.ts          (Next 16 의 middleware) 로그인 여부만 확인
 packages/core           순수 TS 비즈니스 로직 + 단위 테스트 (DB·프레임워크 의존 금지)
@@ -161,7 +165,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - **발주 추천 수량** = 부족 알림 기준 × 2 까지 채우는 양, 기본 입고 단위로 올림.
 - **매장 시간대**: "오늘"·하루의 경계·화면의 날짜와 시각은 `stores.timezone`(기본 Asia/Seoul)을 따른다. 지난 날짜 판매는 그 시간대의 23:59 로 기록. 시간대를 바꿔도 이미 기록된 시각은 그대로이고 보여주는 기준만 바뀐다. 페이지에서는 `requireCurrentStore()` 의 `timeZone` 을 쓴다.
 - **실시간 반영**: 다른 기기의 입출고·품목 변경·판매·판매 취소·실사 입력이 새로고침 없이 반영된다. 입력 중인 폼 값은 유지된다.
-- **삭제 대신 보관**: 품목·메뉴·거래처는 보관(archived_at)만 한다.
+- **삭제 대신 보관**: 품목·메뉴·거래처·옵션은 보관(archived_at)만 한다.
 - **수량 표시**: 단위 이름이 숫자로 시작하면("1L 팩") 수량과 나눠 "2 × 1L 팩"으로 보여준다. 숫자와 단위 이름을 붙여 쓸 땐 `formatQuantity`·`formatUnitCount`·`oneUnitLabel` 을 쓴다 (수량과 단위 이름을 문자열로 직접 붙이지 않는다).
 - **기본 템플릿**: 내용은 `packages/core/src/templates.ts` 한 곳. 같은 이름이 있으면 건너뛰므로 두 번 불러도 안전. 새로 만든 메뉴에만 레시피를 넣는다. 매장 만들 때 템플릿 적용이 실패해도 매장은 만들어지고(서버 로그만 남김) 대시보드에서 다시 불러올 수 있다.
 - **이론 vs 실제(AvT)**: 이론 = 판매로 차감된 양. 실제 = 이론 + 레시피 밖 사용(consume) + 폐기 + 실사에서 모자란 양 + 직접 조정. 금액은 최근 입고 단가 기준. 실사 구간은 (앞 실사 완료, 이번 실사 완료] 로 자른다(실사 조정 원장이 완료 시각에 기록되므로). 그 기간에 세지 않은 품목은 "실사 안 함" — 차이 0 이 "맞았다"는 뜻이 아니다.
@@ -184,13 +188,13 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `stock:count:complete` 실사 완료·취소 | ✓ | ✓ | |
 | `sale:record` 판매 입력 | ✓ | ✓ | ✓ |
 | `sale:cancel` 판매 취소 | ✓ | ✓ | |
-| `sale:import` CSV 판매 가져오기·취소, 메뉴 이름 매칭 | ✓ | ✓ | |
+| `sale:import` CSV 판매 가져오기·취소, 메뉴 이름·옵션 낱말 매칭 | ✓ | ✓ | |
 | `catalog:manage` 품목·카테고리·메뉴·레시피·옵션 | ✓ | ✓ | |
 | `supplier:manage` 거래처 | ✓ | ✓ | |
 | `purchase:manage` 발주·입고 처리 | ✓ | ✓ | |
-| `report:view` 리포트 (`/reports`) | ✓ | ✓ | |
+| `report:view` 리포트 (`/reports`, `/reports/menus`), 원가 알림 | ✓ | ✓ | |
 | `member:manage` 직원 관리 | ✓ | | |
-| `store:manage` 매장 정보 (이름·시간대) | ✓ | | |
+| `store:manage` 매장 정보 (이름·시간대·목표 원가율) | ✓ | | |
 
 권한 확인은 3중이다: 화면(버튼 숨김) → 서버 액션(`can`) → DB(RLS·컬럼 권한·함수). DB가 최종 방어다.
 
@@ -220,9 +224,9 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `20261008055610_sale_import_summaries` | 가져오기별 남은 판매 합계 뷰 |
 | `20261008061943/45_cancelled_sale_keys`, `_sale_cancel_keys` | 하나씩 취소한 가져온 판매의 행 키 표, 취소 방송 트리거가 가져온 판매도 방송·키 기록(가져오기 전체 취소의 cascade 는 제외) |
 | `20261008062519_sale_refunds`, `062523_import_sales_refunds` | 음수 판매(취소·반품) 허용, `import_sales` 재작성(반품 줄, 취소한 키 건너뜀) |
-| `20261008144949_option_aliases`, `144950_import_sales_options` | CSV 옵션 열 낱말 매칭 표 `option_aliases`(RLS), `import_sales` 옵션 기록·차감 |
-| `20261008142544_menu_options`, `142641_menu_option_functions`, `143350_menu_option_rules_check` | 메뉴 옵션·재료 규칙·판매에 붙은 옵션 표와 RLS, `sale_ingredients`, `record_sales` 옵션, `menu_sales_summary` 옵션 묶음별, 옵션 규칙에 쓰인 품목의 기본 단위 잠금 |
 | `20261008135614_target_cost_rate`, `135616_menu_profit` | 매장·메뉴 목표 원가율 컬럼(1~100), 사장의 `stores.target_cost_rate` 수정 권한, 기간별 메뉴 판매 합계 `menu_sales_summary` |
+| `20261008142544_menu_options`, `142641_menu_option_functions`, `143350_menu_option_rules_check` | 메뉴 옵션·재료 규칙·판매에 붙은 옵션 표와 RLS, `sale_ingredients`, `record_sales` 옵션, `menu_sales_summary` 옵션 묶음별, 옵션 규칙에 쓰인 품목의 기본 단위 잠금, 규칙 모양 CHECK 수정(수량 NULL 통과 막음) |
+| `20261008144949_option_aliases`, `144950_import_sales_options` | CSV 옵션 열 낱말 매칭 표 `option_aliases`(RLS), `import_sales` 옵션 기록·차감 |
 
 ### DB 함수·트리거 (상세는 `docs/db-functions.md`)
 | 이름 | 하는 일 |
@@ -238,18 +242,21 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `import_sales` | CSV 판매 묶음(최대 500건) 기록 + 옵션을 반영한 재료 차감. 같은 행 키(`external_id`)는 건너뜀, 사장·매니저 |
 | `stock_usage_summary` (읽기 전용, SECURITY INVOKER) | 기간별 품목 원장 합계 + 그 기간에 센 품목인지. 집계만 하고 계산은 core `avt.ts` |
 | `menu_sales_summary` (읽기 전용, SECURITY INVOKER) | 기간별 메뉴·옵션 묶음 판매량·금액 합계 (반품 상계). 계산은 core `menu-profit.ts` |
+| 트리거 `prevent_item_base_unit_change` | 입출고·레시피·옵션 규칙에 쓰인 품목의 기본 단위 변경 차단 |
 | 트리거 `validate_store` | 매장 이름(공백 제거, 1~50자)·시간대(`pg_timezone_names`) 검사 |
 | 트리거 `broadcast_sale_cancelled` | 판매가 지워지면 `realtime.send` 로 매장 채널에 `sale_cancelled` 방송, 행 키가 있으면 `cancelled_sale_keys` 에 기록 (가져오기 전체 취소의 cascade 는 건너뛰고 `broadcast_sale_import_cancelled` 가 한 번만 방송) |
 
 ### 지켜야 할 DB 규칙
-- 원장(`stock_movements`)·로트·판매·실사 줄 생성·발주 상태와 입고 수량은 **함수로만** 쓴다. 직접 쓰는 정책·컬럼 권한이 없다.
+- 원장(`stock_movements`)·로트·판매(+판매에 붙은 옵션)·실사 줄 생성·발주 상태와 입고 수량은 **함수로만** 쓴다. 직접 쓰는 정책·컬럼 권한이 없다.
 - 한 행만 바꾸는 수정은 테이블에 직접 쓰되, 바꿀 수 있는 칸을 **컬럼 권한**으로 제한한다 (예: `stores` 는 `name`·`timezone`·`target_cost_rate` 만, `purchase_orders` 는 `supplier_id`·`expected_on`·`memo` 만).
 - 새 SECURITY DEFINER 함수는 함수 안에서 로그인·매장 구성원·역할을 직접 확인하고, `SET search_path = ''`, `REVOKE ... FROM PUBLIC, anon` + `GRANT ... TO authenticated` 를 지킨다.
 - 사용자에게 보여줄 오류는 `RAISE EXCEPTION '한국어 문장'`. 화면이 그대로 보여준다.
 - 동시성: 품목 행을 **id 순으로** `FOR UPDATE` 잠근 뒤 로트를 계산한다 (교착 방지).
 - 함수·트리거를 만들거나 바꾸면 `docs/db-functions.md` 를 함께 갱신한다.
 - 이미 적용된 마이그레이션은 고치지 말고 새 마이그레이션을 만든다.
-- 새 표를 추가하면 E2E 정리 순서(`e2e/db.ts` 의 `deleteTestUsers`)도 확인한다. 품목·메뉴·로트를 RESTRICT 로 참조하는 표는 매장보다 먼저 지워야 한다.
+- 새 표를 추가하면 E2E 정리 순서(`e2e/db.ts` 의 `deleteTestUsers`)도 확인한다. 품목·메뉴·로트를 RESTRICT 로 참조하는 표는 매장보다 먼저 지워야 한다 (옵션 규칙이 품목을 RESTRICT 로 참조해 `menu_options` 를 품목보다 먼저 지운다).
+- CHECK 제약에서 `NULL > 0` 은 NULL 이라 **통과한다**. 값이 꼭 있어야 하면 `IS NOT NULL` 을 함께 쓴다 (옵션 규칙에서 한 번 빠뜨렸다).
+- core 계산과 SQL 이 같은 규칙을 갖는 곳(`applyOptions` ↔ `sale_ingredients`, `saleDeductions` ↔ 판매 함수)은 한쪽을 바꾸면 다른 쪽도 바꾸고, 같은 입력으로 결과를 비교해 본다.
 
 ---
 
@@ -287,6 +294,9 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - 알림(토스트)은 화면 갱신보다 조금 먼저 뜬다. 알림 직후 화면을 읽지 말고 `expect(locator).toContainText()` 처럼 바뀐 내용을 기다린다. 같은 문구의 알림이 연달아 뜨는 곳(발주 → 되돌리기 → 다시 발주)은 알림 대신 화면 상태로 확인한다.
 - 다른 기기 반영은 화면을 연 뒤 `waitForRealtime()` 으로 구독 연결을 기다리고 `appearsLive()` / `disappearsLive()` 로 확인한다.
 - 새 기능의 실시간·권한 확인은 "기능을 끄면 테스트가 실패하는지"까지 확인해 두면 좋다 (판매 취소 방송은 트리거를 끄고 실패를 확인했다).
+- `confirm()` 창은 fixture 가 모든 페이지에서 자동으로 수락한다. 테스트에서 `page.once("dialog", ...)` 를 또 걸면 "already handled" 오류가 난다.
+- 판매 화면의 수량 칸 이름은 "메뉴 판매 수량", 옵션 줄은 "메뉴 + 옵션 + 옵션 판매 수량"(옵션은 가나다 순). `getByLabel` 은 부분 일치라 짧은 이름이 겹치면 `exact: true` 를 쓴다.
+- HTML 리포트(스크린샷 첨부)는 `--reporter=line` 으로 돌리면 갱신되지 않는다. 화면을 보려면 기본 리포터로 돌리고 `e2e:report`.
 
 ### Windows 환경
 - `pnpm db:types` 출력은 포맷되지 않은 TS 다 (정상).
@@ -294,6 +304,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - 의존성을 바꿔 `pnpm install` 한 뒤에는 **개발 서버를 다시 띄운다.** 설치 경로가 바뀌면(예: `@playwright/test` 는 Next 의 선택 peer) 떠 있던 서버가 옛 경로와 섞여 404 화면에서 모듈 오류를 낸다. 필요하면 `apps/web/.next` 도 지운다.
 - 백그라운드로 띄운 `pnpm dev` 를 멈춰도 Next 프로세스가 남아 3000 포트를 잡고 있을 수 있다. 포트를 쓰는 프로세스를 확인하고 끈다.
 - 오래 떠 있던 개발 서버가 새 파일을 추가한 뒤 모든 페이지에서 500 + "Jest worker encountered 2 child process exceptions" 를 낸 적이 있다 (2026-10-08). 코드 문제가 아니라 서버를 다시 띄우면 된다. E2E 는 떠 있는 서버를 그대로 쓰므로 이런 실패가 나면 먼저 서버를 다시 띄운다.
+- (AI 도우미용) Claude Code 의 Bash 도구에서 긴 heredoc 으로 파이썬 스크립트를 넘기면 "unexpected EOF" 로 아무것도 실행되지 않은 적이 있다. 긴 편집은 스크립트를 파일로 쓴 뒤 실행한다.
 - 전날부터 떠 있던 개발 서버로 E2E 를 돌리면 모든 시나리오가 "Failed to execute 'measure' on 'Performance': 'Home' cannot have a negative time stamp" 페이지 오류로 실패한 적이 있다 (2026-10-08, React 개발 모드 성능 측정). 서버를 다시 띄우니 통과했다. 같은 오류가 보이면 먼저 서버를 다시 띄운다.
 
 ---
@@ -305,7 +316,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | core 단위 테스트 (vitest) | 44개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`(web·core·db·e2e), `pnpm lint`(web: Next 규칙, core·db: `typescript-eslint` 권장) 통과 |
 | DB 함수·정책 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
-| 브라우저 E2E | `e2e/tests/` 14개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동, 메뉴 수익성·목표 원가율, 메뉴 옵션. 로컬 약 3~6분(3개 병렬), CI 약 5분 |
+| 브라우저 E2E | `e2e/tests/` 14개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동, 메뉴 수익성·목표 원가율, 메뉴 옵션(판매 입력·CSV 옵션 열). 로컬 약 5분(3개 병렬), CI 약 6분 |
 | CI | GitHub Actions 두 잡(`타입·lint·단위 테스트`, `브라우저 E2E`). 실패하면 실행 화면 Artifacts 의 `playwright-report` 를 받아 본다 |
 
 E2E 는 `@playwright/test` 다. 시나리오 하나가 테스트 하나이고 단계(`test.step`)로 나뉘며, 확인 항목은 `expect.soft` 라 하나가 실패해도 끝까지 돈다. 실패하면 한 번 재시도한다(재시도에서 통과하면 `flaky`).
@@ -321,20 +332,20 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 - **경쟁사** (공식 가격 페이지, 2026-10-08 확인): MarketMan Starter $249·Growth $299/월, WISK 단일 매장 $249/월(음료 또는 음식) + 도입비 $750. 둘 다 POS 60여 개 연동, AvT·단가 알림·추천 발주·청구서 OCR·매장 간 이동이 핵심. 국내 개인 카페에는 1/10 수준 가격이 현실적 → **셀프 세팅 + 국내 연동(POS·카카오)** 으로 차별화.
 - **타깃 후보**: 개인 카페(무료·저가) + 2~10개 매장 소규모 체인(매장 비교·통합 발주로 높은 요금).
 - **검증 제안**: 기능을 더 만들기 전에 아는 카페 2~3곳에서 2주 시범 사용 (판매 입력을 매일 하는지, 원가율을 보고 가격을 바꾸는지 확인). 시범 사용에는 배포(5)가 필요하다.
-- 사용자와 합의한 순서: ① AvT 리포트(완료) → ② 입고 단가 변동 알림(완료) → ③ CSV 판매 업로드(완료) → ④ 메뉴 수익성 순위(완료).
-- 2026-10-08 경쟁사 2차 조사로 꼭 필요한 기능 3개를 더함 (§10-0): ⑤ 메뉴 옵션 차감 ⑥ 목표 원가율·권장 판매가(④와 함께) ⑦ 소진 예상일·판매량 기반 추천 발주. 배포·시범 매장(5)은 이 기능들보다 먼저 하기를 권장 (사용자 결정). 고르지 않은 아이디어는 §10-9
+- 사용자와 합의한 순서: ① AvT 리포트(완료) → ② 입고 단가 변동 알림(완료) → ③ CSV 판매 업로드(완료) → ④ 메뉴 수익성 순위(완료, 2026-10-08).
+- 2026-10-08 경쟁사 2차 조사로 꼭 필요한 기능 3개를 더함 (§10-0): ⑤ 메뉴 옵션 차감(완료, 2026-10-09) ⑥ 목표 원가율·권장 판매가(완료, ④와 함께) ⑦ 소진 예상일·판매량 기반 추천 발주(**다음 작업**). 배포·시범 매장(5)은 이 기능들보다 먼저 하기를 권장 (사용자 결정). 고르지 않은 아이디어는 §10-9
 
 ### 0) 경쟁사 2차 조사에서 고른 꼭 필요한 기능 (2026-10-08)
 조사 대상: MarketMan, WISK, xtraCHEF(Toast), Restaurant365, Apicbase, 페이히어, 토스플레이스, 국내 원가 앱(키친코스트 등), 식자재 앱(마켓봄·식봄·오더히어로).
-- [x] **메뉴 옵션 차감** (샷 추가·사이즈업·오트밀크 변경·시럽 추가) — 완료 (2026-10-08): 옵션·재료 규칙·판매 입력·원가, CSV 옵션 열 연결. 동작은 §5
+- [x] **메뉴 옵션 차감** (샷 추가·사이즈업·오트밀크 변경·시럽 추가) — 완료 (2026-10-08~09): 옵션·재료 규칙·판매 입력·원가, CSV 옵션 열 연결. 동작은 §5
   - 남은 것(필요하면): 기본 템플릿에 옵션(샷 추가 등), 메뉴별로 붙일 수 있는 옵션 제한, 메뉴 상세에 옵션별 원가, 옵션 개수("샷추가 x2"), 실제 POS 파일의 옵션 열 모양 확인(시범 매장)
-  - 왜: 카페 판매의 상당수에 옵션이 붙는다. 옵션이 빠지면 이론 사용량이 틀리고 그 차이가 AvT 에서 로스로 보여 리포트 신뢰가 떨어진다. CSV 가져오기의 `menu_aliases` 는 "아메리카노 + 샷추가" 를 아메리카노에 묶을 뿐 샷 원두는 차감하지 않는다
-  - 어떻게: 메뉴별 옵션과 옵션 레시피(재료 추가 또는 대체: 우유 → 오트밀크), 판매 입력에서 옵션 선택, CSV 의 옵션 열(토스 "옵션") 연결, 원가·원가율에 반영. 스키마 변경 필요
+  - 왜(만들 때의 이유): 카페 판매의 상당수에 옵션이 붙는다. 옵션이 빠지면 이론 사용량이 틀리고 그 차이가 AvT 에서 로스로 보여 리포트 신뢰가 떨어진다. 그전에는 CSV 의 `menu_aliases` 가 "아메리카노 + 샷추가" 를 아메리카노에 묶을 뿐 샷 원두는 차감하지 않았다
+  - 어떻게 만들었나: 매장 단위 옵션 + 재료 규칙(추가·바꾸기·늘리기), 판매 입력의 옵션 묶음 줄, CSV 옵션 열 낱말 매칭(옵션/메뉴 이름에 붙임/무시), 메뉴 수익성 재료비 반영
   - 참고: xtraCHEF (POS modifier 를 레시피에 연결)
 - [x] **목표 원가율 → 권장 판매가, 마진 하락 알림** — 완료 (2026-10-08, 메뉴 수익성 순위와 함께)
   - 매장 기본 + 메뉴별 목표 원가율, "목표 맞추는 판매가", 단가 변동으로 목표를 넘으면 입고 알림·대시보드에서 경고. 동작은 §5
   - 참고: WISK (메뉴 마진이 기준 아래로 떨어지면 알림), 키친코스트 (목표 원가율 → 판매가)
-- [ ] **소진 예상일 + 판매량 기반 추천 발주** (§10-6 에서 옮김)
+- [ ] **소진 예상일 + 판매량 기반 추천 발주** (§10-6 에서 옮김) — **다음 작업**
   - 최근 일평균 사용량(원장의 sale·consume)으로 "원두 4일 뒤 소진"을 대시보드·품목 목록에. 발주 추천을 "부족 기준 × 2" → 일평균 사용량 × (입고 소요일 + 여유일)로. 거래처에 입고 소요일 칸 추가
   - CSV 가져오기로 판매 데이터가 쌓이면 의미가 생긴다. 매일 앱을 여는 이유가 되는 기능
   - 참고: 페이히어 (출고 데이터로 3·7·14일 뒤 품절 위험 예측), MarketMan (사용량 기반 추천 발주)
@@ -348,6 +359,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 - [ ] **실제 POS 파일로 확인** (시범 매장에서 받기): 토스 포스 "상품 주문" 시트, 다른 POS(포스페이·OKPOS 등) 열 이름. 맞지 않으면 core `HEADER_HINTS` 에 추가
 - [ ] 엑셀(xlsx) 바로 올리기 (지금은 CSV 로 저장해야 함. 토스 파일은 비밀번호가 걸려 있다)
 - [x] 취소·반품 줄 처리 (음수 판매 + 재료 되돌림, 상태 열 "취소" 주문 상계)
+- [x] 옵션 열 연결 (2026-10-09): 낱말마다 옵션 / 메뉴 이름에 붙임 / 무시, `option_aliases` 에 기억, 옵션 재료 차감
 - [ ] 되돌린 재료는 유통기한 로트 없이 들어간다. 만든 뒤 버린 음료면 실제로는 폐기라 이론 vs 실제에 "기록 안 된 손실"로 보인다 (의도한 동작)
 - [ ] 이후 POS 직접 연동(웹훅 또는 주기 동기화, `source = 'pos'`)
 
@@ -361,7 +373,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 ### 5) 배포 — 시범 매장 전에 필요 (사용자 결정 필요)
 후보: **Supabase 클라우드(서울 리전) + Vercel**. Supabase·Vercel 계정 로그인은 사용자가 직접 해야 한다.
 - [ ] 정할 것: 환경 개수(운영만 / 운영+스테이징), 요금 등급, 주소(기본 `*.vercel.app` / 도메인)
-- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 27개)
+- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 32개)
 - [ ] 인증 설정: 가입 확인 메일 켜기(코드는 대비됨: 세션 없이 오면 확인 메일 안내), 사이트 주소·리디렉트 주소, 운영 SMTP
 - [ ] Vercel 프로젝트: GitHub 연결, 루트 `apps/web`, 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`), 함수 리전 서울
 - [ ] 배포 주소에서 가입~판매 직접 확인. 운영 DB에 E2E 를 돌리지 않는다 (테스트 계정이 생김) — 필요하면 스테이징에서
@@ -432,6 +444,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 - **배포 없음** (로컬 전용, §10)
 - **리포트 금액은 최근 입고 단가 기준**: 기간 중 단가가 바뀌었으면 실제 지출과 조금 다를 수 있다 (메뉴 원가율과 같은 기준). 품목별 차이 금액과 원인별 합계는 각각 반올림해서 1원 정도 안 맞을 수 있다
 - **메뉴 수익성의 재료비는 "지금" 레시피·단가 기준**: 기간 중 레시피나 단가가 바뀌었으면 그때의 실제 재료비와 다르다. 분류(효자 등)는 판매가 있는 메뉴끼리의 상대 비교라, 메뉴가 2~3개뿐이면 평균과 거의 같은 메뉴도 한쪽으로 나뉜다
+- **옵션**: 매장 단위라 어느 메뉴에나 붙일 수 있다(메뉴별 제한 없음). 같은 재료를 바꾸는 옵션 두 개(오트밀크·두유)를 함께 붙이면 하나만 적용된다(`item_id` 가 작은 쪽). 기본 템플릿에는 옵션이 없다. 메뉴 상세에는 옵션별 원가가 없고 옵션 상세의 "메뉴별 원가 변화"에서 본다
 - **CSV 옵션 개수는 1개로 친다**: "샷추가 x2" 처럼 옵션 뒤의 개수는 떼어 버린다. 실제 POS 파일 모양을 보고 정한다 (같은 옵션을 두 번 붙이는 것은 DB 가 막는다)
 - 판매 화면·대시보드의 하루 매출은 아직 판매 기록을 한 줄씩 읽어 더한다 (API 최대 1,000행). 하루 1,000건을 넘는 매장이 생기면 `menu_sales_summary` 로 바꾼다
 - **리포트의 정확도는 판매 입력과 실사에 달렸다**: 판매를 빠뜨리면 이론이 줄어 차이가 커 보이고, 실사를 안 하면 기록 안 된 손실이 안 보인다 (화면에 안내함)
