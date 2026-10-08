@@ -1,6 +1,6 @@
 # 인수인계 문서 — cafe-manager
 
-작성일: 2026-10-06 · 최종 갱신: 2026-10-08 · 기준 커밋: `89794a1` (main)
+작성일: 2026-10-06 · 최종 갱신: 2026-10-08 · 기준 커밋: `7a3f83c` (main)
 
 이 문서 하나로 프로젝트를 이어받을 수 있게 정리했다. 세부 기록은 아래 문서에 있다.
 
@@ -358,7 +358,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-08 | `f0db5f8` | 수량 표시 수정: "1L 팩" 같은 단위가 수량과 붙어 "11L 팩"으로 읽히던 문제 → "1 × 1L 팩" |
 | 10-08 | `1255a6f` | 카페 기본 템플릿 (품목 11·메뉴 10·레시피), `apply_store_template`, 매장 만들기 체크·대시보드 버튼 |
 | 10-08 | `89794a1` | 이론 vs 실제 리포트(AvT) `/reports`, `stock_usage_summary`, core `avt.ts` |
-| 10-08 | (이번 커밋) | 입고 단가 변동 알림: `item_cost_changes` 뷰, core `cost-changes.ts`, 입고 직후 알림·대시보드 카드·품목 상세 |
+| 10-08 | `7a3f83c` | 입고 단가 변동 알림: `item_cost_changes` 뷰, core `cost-changes.ts`, 입고 직후 알림·대시보드 카드·품목 상세 |
 
 ---
 
