@@ -19,13 +19,13 @@
 
 | 항목 | 상태 |
 |---|---|
-| 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림** |
+| 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기** |
 | 저장소 | https://github.com/ll-lrv/cafe-manager (**공개**) |
 | CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 최근 실행(`89794a1`) 모두 통과 |
-| 테스트 | core 단위 31개, 브라우저 E2E 11개 시나리오 (로컬 통과) |
+| 테스트 | core 단위 37개, 브라우저 E2E 12개 시나리오 (로컬 통과) |
 | 배포 | **아직 없음.** 로컬 Supabase(Docker)에서만 동작. 후보: Supabase 클라우드(서울) + Vercel (§10) |
 | 로컬 DB | 2026-10-07 에 비운 뒤 **데모 계정 하나**를 만들어 둠: `demo-owner@cafe.kr` / `test1234` ("데모 카페", 품목 3·메뉴 2·판매 65잔). 실사 기록은 없다 |
-| 다음 | CSV 판매 업로드 → 메뉴 수익성 순위 → 배포·시범 매장 (§10) |
+| 다음 | 메뉴 수익성 순위 → 배포·시범 매장 (§10) |
 
 ---
 
@@ -127,7 +127,7 @@ docs/                   이 문서, PROGRESS, db-functions
 ```
 
 ### packages/core 주요 함수
-단위 환산(`toBaseQuantity`, `formatQuantity`, `formatUnitCount`, `oneUnitLabel`), 레시피 차감(`saleDeductions`), 원가(`recipeCost`, `costRate`), FIFO(`allocateFifo`), 실사 조정(`countAdjustments`), 발주(`derivePurchaseOrderStatus`, `suggestOrderQuantity`, `orderTotal`), 재고·유통기한 상태(`stockStatus`, `expiryStatus`), 시간대(`dateInTimeZone`, `zonedTimeToUtc`, `isValidTimeZone`), 권한(`can`), 기본 템플릿 데이터(`CAFE_TEMPLATE`), 이론 vs 실제(`avtLine`, `avtSummary`, `sortAvtLines`), 단가 변동(`costChangePercent`, `isNotableCostChange`, `menuCostImpacts`, 기준 `COST_ALERT_PERCENT`·`COST_ALERT_DAYS`). 테스트 31개.
+단위 환산(`toBaseQuantity`, `formatQuantity`, `formatUnitCount`, `oneUnitLabel`), 레시피 차감(`saleDeductions`), 원가(`recipeCost`, `costRate`), FIFO(`allocateFifo`), 실사 조정(`countAdjustments`), 발주(`derivePurchaseOrderStatus`, `suggestOrderQuantity`, `orderTotal`), 재고·유통기한 상태(`stockStatus`, `expiryStatus`), 시간대(`dateInTimeZone`, `zonedTimeToUtc`, `isValidTimeZone`), 권한(`can`), 기본 템플릿 데이터(`CAFE_TEMPLATE`), 이론 vs 실제(`avtLine`, `avtSummary`, `sortAvtLines`), 단가 변동(`costChangePercent`, `isNotableCostChange`, `menuCostImpacts`, 기준 `COST_ALERT_PERCENT`·`COST_ALERT_DAYS`), 판매 파일 읽기(`decodeCsv`, `parseCsv`, `findHeaderRow`, `guessColumns`, `parseSaleDateTime`, `readSaleRows`, `matchMenus`). 테스트 37개.
 DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기면 core 함수를 쓰고 SQL은 지운다.
 
 ---
@@ -138,7 +138,8 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 |---|---|---|
 | `/login`, `/onboarding`, `/invite/[token]` | 로그인·가입, 매장 만들기(카페 기본 템플릿 체크, 기본 켜짐), 초대 수락 | 누구나 |
 | `/dashboard` | 오늘 매출, 부족 품목, 유통기한 확인, 진행 중 실사, 입고 단가 변동, 입고 예정, 최근 기록. 품목이 없으면 "기본 템플릿 불러오기" | 구성원 (단가 변동·입고 예정·템플릿은 사장·매니저) |
-| `/sales` | 메뉴별 판매 일괄 입력(± 버튼), 차감될 재료 미리보기, 날짜 이동(지난 날은 23:59로 기록), 매출 합계, 판매 취소 | 입력: 구성원 / 취소: 사장·매니저 |
+| `/sales` | 메뉴별 판매 일괄 입력(± 버튼), 차감될 재료 미리보기, 날짜 이동(지난 날은 23:59로 기록), 매출 합계, 판매 취소 (가져온 판매는 "CSV" 표시) | 입력: 구성원 / 취소: 사장·매니저 |
+| `/sales/import` | CSV 판매 가져오기: 파일(UTF-8·EUC-KR) → 열 맞추기(자동 추측) → 메뉴 맞추기(저장해 두고 다음에 자동) → 가져오기(500건씩), 가져오기 기록·취소 | 사장·매니저 |
 | `/stock` | 입고·사용·폐기·조정, 재고 미리보기, 단가·유통기한, 최근 기록 | 구성원 / 조정: 사장·매니저 |
 | `/items`, `/items/[id]`, `/items/new`, `/items/categories` | 품목·재고 목록(상태 필터), 상세(로트별 남은 양, 기록, 입고 단가와 최근 변동), 입고 단위, 기본 거래처, 카테고리 | 보기: 구성원 (입고 단가는 사장·매니저) / 관리: 사장·매니저 |
 | `/menus`, `/menus/[id]`, `/menus/new` | 메뉴 가격, 레시피, 원가·원가율 | 보기: 구성원 / 관리: 사장·매니저 |
@@ -161,6 +162,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - **수량 표시**: 단위 이름이 숫자로 시작하면("1L 팩") 수량과 나눠 "2 × 1L 팩"으로 보여준다. 숫자와 단위 이름을 붙여 쓸 땐 `formatQuantity`·`formatUnitCount`·`oneUnitLabel` 을 쓴다 (수량과 단위 이름을 문자열로 직접 붙이지 않는다).
 - **기본 템플릿**: 내용은 `packages/core/src/templates.ts` 한 곳. 같은 이름이 있으면 건너뛰므로 두 번 불러도 안전. 새로 만든 메뉴에만 레시피를 넣는다. 매장 만들 때 템플릿 적용이 실패해도 매장은 만들어지고(서버 로그만 남김) 대시보드에서 다시 불러올 수 있다.
 - **이론 vs 실제(AvT)**: 이론 = 판매로 차감된 양. 실제 = 이론 + 레시피 밖 사용(consume) + 폐기 + 실사에서 모자란 양 + 직접 조정. 금액은 최근 입고 단가 기준. 실사 구간은 (앞 실사 완료, 이번 실사 완료] 로 자른다(실사 조정 원장이 완료 시각에 기록되므로). 그 기간에 세지 않은 품목은 "실사 안 함" — 차이 0 이 "맞았다"는 뜻이 아니다.
+- **CSV 판매 가져오기**: 한 줄 = 메뉴 하나의 판매(날짜[·시각], 메뉴 이름[+옵션], 수량, [금액], [주문번호]). 파일은 브라우저에서 읽고(core `sales-import.ts`), 서버 액션이 매장 시간대로 판매 시각을 만든다(시각이 없으면 그 날 23:59:59, 오늘이면 지금). 행 키 = 파일 내용(날짜·시각·주문번호·이름·수량·금액 + 같은 내용 몇 번째)이라 같은 파일·겹치는 기간을 다시 올려도 중복되지 않는다. 취소·반품 줄(수량 ≤ 0), 합계 줄, 미래 날짜는 가져오지 않는다. 가져오기를 취소하면 그때 들어온 판매·재료 차감이 cascade 로 지워진다. 토스 포스는 매출 엑셀(비밀번호 걸린 xlsx)의 "상품 주문" 시트를 CSV 로 저장해서 올린다 (열 이름은 2026-10-08 토스플레이스 안내 글 기준, 실제 파일로는 아직 확인 못 함).
 - **입고 단가 변동 알림**: 품목의 "가장 최근 단가 변동" = 직전 입고와 단가가 달라진 마지막 입고(`item_cost_changes` 뷰). 직전보다 5% 이상(`COST_ALERT_PERCENT`) 바뀌면 ① 입고 직후 알림(입출고·발주 입고, 알림 아래 안내로 12초) ② 대시보드 카드(최근 14일, `COST_ALERT_DAYS`) ③ 품목 상세(기준 미만도 표시)에 그 품목을 쓰는 메뉴의 원가율 변화를 보여준다. 다른 재료는 지금 단가로 계산한다. 원가 정보라 `report:view`(사장·매니저)에게만 보인다. 입고 직후 알림은 입고 전·후 `item_latest_costs` 를 비교한다 (`lib/cost-notice.ts`).
 
 ---
@@ -177,6 +179,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `stock:count:complete` 실사 완료·취소 | ✓ | ✓ | |
 | `sale:record` 판매 입력 | ✓ | ✓ | ✓ |
 | `sale:cancel` 판매 취소 | ✓ | ✓ | |
+| `sale:import` CSV 판매 가져오기·취소, 메뉴 이름 매칭 | ✓ | ✓ | |
 | `catalog:manage` 품목·카테고리·메뉴·레시피 | ✓ | ✓ | |
 | `supplier:manage` 거래처 | ✓ | ✓ | |
 | `purchase:manage` 발주·입고 처리 | ✓ | ✓ | |
@@ -190,7 +193,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 ## 7. DB
 
-### 마이그레이션 (적용 순서, 18개 — CI 가 매번 빈 DB에 처음부터 적용)
+### 마이그레이션 (적용 순서, 21개 — CI 가 매번 빈 DB에 처음부터 적용)
 | 파일 | 내용 |
 |---|---|
 | `20261003015300_init` | 전체 스키마 (Drizzle) |
@@ -207,6 +210,9 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `20261008031736_apply_store_template` | 기본 템플릿 불러오기 함수 |
 | `20261008033540_stock_usage_summary` | 기간별 품목 원장 합계 (읽기 전용, 리포트용) |
 | `20261008051034_item_cost_changes` | 품목별 가장 최근 입고 단가 변동 뷰 (단가 알림용) |
+| `20261008055302_sale_imports` | 가져오기 기록 `sale_imports`, 메뉴 이름 매칭 `menu_aliases`, `sale_records.import_id` |
+| `20261008055315_sale_import_functions` | 위 두 표의 RLS, `import_sales` 함수, 가져오기 취소 방송 |
+| `20261008055610_sale_import_summaries` | 가져오기별 남은 판매 합계 뷰 |
 
 ### DB 함수·트리거 (상세는 `docs/db-functions.md`)
 | 이름 | 하는 일 |
@@ -218,6 +224,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `stock_outflow` (내부 전용) | 유통기한 순 차감 공용 로직 |
 | `create_store`, `accept_invitation`, `get_invitation` | 매장 만들기, 초대 |
 | `apply_store_template` | 카테고리·품목·입고 단위·메뉴·레시피를 한 트랜잭션으로 (같은 이름은 건너뜀, 사장·매니저) |
+| `import_sales` | CSV 판매 묶음(최대 500건) 기록 + 재료 차감. 같은 행 키(`external_id`)는 건너뜀, 사장·매니저 |
 | `stock_usage_summary` (읽기 전용, SECURITY INVOKER) | 기간별 품목 원장 합계 + 그 기간에 센 품목인지. 집계만 하고 계산은 core `avt.ts` |
 | 트리거 `validate_store` | 매장 이름(공백 제거, 1~50자)·시간대(`pg_timezone_names`) 검사 |
 | 트리거 `broadcast_sale_cancelled` | 판매가 지워지면 `realtime.send` 로 매장 채널에 `sale_cancelled` 방송 |
@@ -282,10 +289,10 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 | 종류 | 상태 |
 |---|---|
-| core 단위 테스트 (vitest) | 31개, `pnpm test` |
+| core 단위 테스트 (vitest) | 37개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`(web·core·db·e2e), `pnpm lint`(web: Next 규칙, core·db: `typescript-eslint` 권장) 통과 |
 | DB 함수·정책 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
-| 브라우저 E2E | `e2e/tests/` 11개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동. 로컬 약 3~6분(3개 병렬), CI 약 5분 |
+| 브라우저 E2E | `e2e/tests/` 12개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동. 로컬 약 3~6분(3개 병렬), CI 약 5분 |
 | CI | GitHub Actions 두 잡(`타입·lint·단위 테스트`, `브라우저 E2E`). 실패하면 실행 화면 Artifacts 의 `playwright-report` 를 받아 본다 |
 
 E2E 는 `@playwright/test` 다. 시나리오 하나가 테스트 하나이고 단계(`test.step`)로 나뉘며, 확인 항목은 `expect.soft` 라 하나가 실패해도 끝까지 돈다. 실패하면 한 번 재시도한다(재시도에서 통과하면 `flaky`).
@@ -301,17 +308,20 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 - **경쟁사** (공식 가격 페이지, 2026-10-08 확인): MarketMan Starter $249·Growth $299/월, WISK 단일 매장 $249/월(음료 또는 음식) + 도입비 $750. 둘 다 POS 60여 개 연동, AvT·단가 알림·추천 발주·청구서 OCR·매장 간 이동이 핵심. 국내 개인 카페에는 1/10 수준 가격이 현실적 → **셀프 세팅 + 국내 연동(POS·카카오)** 으로 차별화.
 - **타깃 후보**: 개인 카페(무료·저가) + 2~10개 매장 소규모 체인(매장 비교·통합 발주로 높은 요금).
 - **검증 제안**: 기능을 더 만들기 전에 아는 카페 2~3곳에서 2주 시범 사용 (판매 입력을 매일 하는지, 원가율을 보고 가격을 바꾸는지 확인). 시범 사용에는 배포(5)가 필요하다.
-- 사용자와 합의한 순서: ① AvT 리포트(완료) → ② 입고 단가 변동 알림(완료) → ③ CSV 판매 업로드 → ④ 메뉴 수익성 순위.
+- 사용자와 합의한 순서: ① AvT 리포트(완료) → ② 입고 단가 변동 알림(완료) → ③ CSV 판매 업로드(완료) → ④ 메뉴 수익성 순위.
 
 ### 1) 입고 단가 변동 알림 — 완료 (2026-10-08)
 - [x] 입고 직후 알림, 대시보드 카드, 품목 상세. 동작은 §5 "꼭 알아야 할 동작"
 - [ ] 남은 것(필요하면): 품목별 단가 추이 그래프, 알림 기준을 매장 설정으로, 알림 발송(§10-6)
 
-### 2) CSV 판매 업로드 (매출 연동 1단계) — 다음 작업
-- [ ] 파일 → 메뉴 매칭(`menus.external_id`) → `record_sales` 를 `source = 'csv'`, `external_id` 로 호출 (`sale_records_external_key` 로 중복 방지). 함수에 source·external_id 인자 추가 필요
-- [ ] 국내 POS(토스플레이스 등) 내보내기 형식을 확인하고 매칭 화면. 이후 POS 직접 연동(웹훅 또는 주기 동기화)
+### 2) CSV 판매 업로드 (매출 연동 1단계) — 완료 (2026-10-08)
+- [x] `/sales/import`: CSV → 열·메뉴 맞추기 → `import_sales` (`source = 'csv'`, 행 키로 중복 방지), 가져오기 취소. 메뉴 매칭은 `menus.external_id` 대신 `menu_aliases`(한 메뉴에 여러 POS 이름: 사이즈·옵션)
+- [ ] **실제 POS 파일로 확인** (시범 매장에서 받기): 토스 포스 "상품 주문" 시트, 다른 POS(포스페이·OKPOS 등) 열 이름. 맞지 않으면 core `HEADER_HINTS` 에 추가
+- [ ] 엑셀(xlsx) 바로 올리기 (지금은 CSV 로 저장해야 함. 토스 파일은 비밀번호가 걸려 있다)
+- [ ] 취소·반품 줄 처리: 지금은 건너뛴다. 원래 판매가 같은 파일에 있으면 그 판매가 남는다
+- [ ] 이후 POS 직접 연동(웹훅 또는 주기 동기화, `source = 'pos'`)
 
-### 3) 메뉴 수익성 순위
+### 3) 메뉴 수익성 순위 — 다음 작업
 - [ ] 메뉴별 판매량 × 개당 마진으로 "많이 벌어주는 메뉴 / 많이 팔리지만 남는 게 적은 메뉴". `/reports` 에 탭으로 추가 (`report:view`)
 
 ### 4) 폐기 사유·폐기율
@@ -320,7 +330,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 ### 5) 배포 — 시범 매장 전에 필요 (사용자 결정 필요)
 후보: **Supabase 클라우드(서울 리전) + Vercel**. Supabase·Vercel 계정 로그인은 사용자가 직접 해야 한다.
 - [ ] 정할 것: 환경 개수(운영만 / 운영+스테이징), 요금 등급, 주소(기본 `*.vercel.app` / 도메인)
-- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 18개)
+- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 21개)
 - [ ] 인증 설정: 가입 확인 메일 켜기(코드는 대비됨: 세션 없이 오면 확인 메일 안내), 사이트 주소·리디렉트 주소, 운영 SMTP
 - [ ] Vercel 프로젝트: GitHub 연결, 루트 `apps/web`, 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`), 함수 리전 서울
 - [ ] 배포 주소에서 가입~판매 직접 확인. 운영 DB에 E2E 를 돌리지 않는다 (테스트 계정이 생김) — 필요하면 스테이징에서
@@ -359,6 +369,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-08 | `1255a6f` | 카페 기본 템플릿 (품목 11·메뉴 10·레시피), `apply_store_template`, 매장 만들기 체크·대시보드 버튼 |
 | 10-08 | `89794a1` | 이론 vs 실제 리포트(AvT) `/reports`, `stock_usage_summary`, core `avt.ts` |
 | 10-08 | `7a3f83c` | 입고 단가 변동 알림: `item_cost_changes` 뷰, core `cost-changes.ts`, 입고 직후 알림·대시보드 카드·품목 상세 |
+| 10-08 | (이번 커밋) | CSV 판매 가져오기 `/sales/import`: `import_sales`, `sale_imports`·`menu_aliases`, core `sales-import.ts` |
 
 ---
 
@@ -368,7 +379,8 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 - **리포트 금액은 최근 입고 단가 기준**: 기간 중 단가가 바뀌었으면 실제 지출과 조금 다를 수 있다 (메뉴 원가율과 같은 기준). 품목별 차이 금액과 원인별 합계는 각각 반올림해서 1원 정도 안 맞을 수 있다
 - **리포트의 정확도는 판매 입력과 실사에 달렸다**: 판매를 빠뜨리면 이론이 줄어 차이가 커 보이고, 실사를 안 하면 기록 안 된 손실이 안 보인다 (화면에 안내함)
 - 기본 템플릿 메뉴의 양·가격은 예시값이다. 단가는 입고해야 생기므로 불러온 직후 원가는 0원
-- E2E `orders` 시나리오가 3개 병렬 실행 중 한 번 실패 후 재시도에서 통과한 적이 있다 (2026-10-08, 단독 실행 2회는 통과). 반복되면 원인 확인
+- E2E `orders` 가 병렬 실행 중 가끔 재시도에서 통과했다 (2026-10-08 두 번). 두 번째 원인: 입고 완료 알림 직후 화면을 읽음 → 입고 폼이 사라지기를 기다리게 고침. 또 나오면 trace 확인
+- **CSV 가져오기 크기**: 한 파일 2만 줄까지, 500건씩 나눠 보낸다. 판매마다 원장이 생겨 Realtime 이벤트가 많이 나간다(화면은 0.3초 모아 한 번 새로고침). 큰 매장 한 달치는 기간을 나눠 올리는 것을 권한다
 - **단가 변동은 "직전 입고"와 비교한다**: 큰 변동 뒤에 단가가 조금(5% 미만) 또 바뀌면 가장 최근 변동이 작은 쪽이 되어 대시보드에서 빠진다. 같은 단가로 다시 입고하는 것은 변동으로 치지 않는다
 - 한 트랜잭션 안에서 입고를 두 번 하면 "최근 입고 단가"가 같은 시각이라 어느 쪽인지 정해지지 않는다 (실제 사용에서는 기록마다 시각이 달라 문제없음)
 - 실사로 늘어난 양은 유통기한 정보 없이 기록된다 (품목 상세에 "유통기한 기록 없음"으로 표시). 입출고 화면의 "조정 → 늘리기"는 유통기한을 넣을 수 있다

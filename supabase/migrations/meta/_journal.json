@@ -127,6 +127,27 @@
       "when": 1791436234516,
       "tag": "20261008051034_item_cost_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791438782953,
+      "tag": "20261008055302_sale_imports",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791438795414,
+      "tag": "20261008055315_sale_import_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791438970023,
+      "tag": "20261008055610_sale_import_summaries",
+      "breakpoints": true
     }
   ]
 }

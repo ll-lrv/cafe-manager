@@ -187,11 +187,10 @@ test("거래처·발주·입고 처리", async ({ app }) => {
       stockOf(bean) === "3500.000" && stockOf(cup) === "100.000",
       `${stockOf(bean)}, ${stockOf(cup)}`,
     );
+    // 알림이 화면 갱신보다 조금 먼저 뜰 수 있어 입고 폼이 사라지기를 기다린다.
+    await expect(p.getByRole("button", { name: /입고 처리/ })).toHaveCount(0);
     const text = await main(p);
-    check(
-      "완료 화면: 입고 완료, 입고 폼 없음",
-      text.includes("입고 완료") && (await p.getByRole("button", { name: /입고 처리/ }).count()) === 0,
-    );
+    check("완료 화면: 입고 완료, 입고 폼 없음", text.includes("입고 완료"));
     const lots = sql(
       `select count(*) from stock_movements m join purchase_order_lines l on l.id = m.purchase_order_line_id where l.purchase_order_id = '${idFromUrl(p.url())}' and m.lot_id is not null`,
     );

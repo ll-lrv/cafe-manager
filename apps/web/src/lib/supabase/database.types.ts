@@ -101,6 +101,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"menu_aliases": {
+                  Row: {
+                    "created_at": string,"id": string,"menu_id": string | null,"source_name": string,"store_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"menu_id"?: string | null,"source_name": string,"store_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"menu_id"?: string | null,"source_name"?: string,"store_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "menu_aliases_menu_id_menus_id_fk"
+      columns: ["menu_id"]
+isOneToOne: false
+      referencedRelation: "menus"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "menu_aliases_store_id_stores_id_fk"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"menus": {
                   Row: {
                     "archived_at": string | null,"created_at": string,"external_id": string | null,"id": string,"is_active": boolean,"name": string,"price": number,"store_id": string,"updated_at": string
@@ -237,16 +263,42 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"sale_records": {
+                },"sale_imports": {
                   Row: {
-                    "amount": number | null,"created_at": string,"created_by": string | null,"external_id": string | null,"id": string,"menu_id": string,"quantity": number,"sold_at": string,"source": Database["public"]['Enums']["sale_source"],"store_id": string
+                    "created_at": string,"created_by": string | null,"file_name": string,"id": string,"store_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount"?: number | null,"created_at"?: string,"created_by"?: string | null,"external_id"?: string | null,"id"?: string,"menu_id": string,"quantity": number,"sold_at"?: string,"source"?: Database["public"]['Enums']["sale_source"],"store_id": string
+                    "created_at"?: string,"created_by"?: string | null,"file_name": string,"id"?: string,"store_id": string
                   }
                   Update: {
-                    "amount"?: number | null,"created_at"?: string,"created_by"?: string | null,"external_id"?: string | null,"id"?: string,"menu_id"?: string,"quantity"?: number,"sold_at"?: string,"source"?: Database["public"]['Enums']["sale_source"],"store_id"?: string
+                    "created_at"?: string,"created_by"?: string | null,"file_name"?: string,"id"?: string,"store_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "sale_imports_created_by_profiles_id_fk"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_imports_store_id_stores_id_fk"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"sale_records": {
+                  Row: {
+                    "amount": number | null,"created_at": string,"created_by": string | null,"external_id": string | null,"id": string,"import_id": string | null,"menu_id": string,"quantity": number,"sold_at": string,"source": Database["public"]['Enums']["sale_source"],"store_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"created_at"?: string,"created_by"?: string | null,"external_id"?: string | null,"id"?: string,"import_id"?: string | null,"menu_id": string,"quantity": number,"sold_at"?: string,"source"?: Database["public"]['Enums']["sale_source"],"store_id": string
+                  }
+                  Update: {
+                    "amount"?: number | null,"created_at"?: string,"created_by"?: string | null,"external_id"?: string | null,"id"?: string,"import_id"?: string | null,"menu_id"?: string,"quantity"?: number,"sold_at"?: string,"source"?: Database["public"]['Enums']["sale_source"],"store_id"?: string
                   }
                   Relationships: [
                     {
@@ -254,6 +306,18 @@ isOneToOne: false
       columns: ["created_by"]
 isOneToOne: false
       referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_records_import_id_sale_imports_id_fk"
+      columns: ["import_id"]
+isOneToOne: false
+      referencedRelation: "sale_import_summaries"
+      referencedColumns: ["import_id"]
+    },{
+      foreignKeyName: "sale_records_import_id_sale_imports_id_fk"
+      columns: ["import_id"]
+isOneToOne: false
+      referencedRelation: "sale_imports"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "sale_records_menu_id_menus_id_fk"
@@ -638,6 +702,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"sale_import_summaries": {
+                  Row: {
+                    "amount": number | null,"first_sold_at": string | null,"import_id": string | null,"last_sold_at": string | null,"quantity": number | null,"sale_count": number | null,"store_id": string | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "sale_imports_store_id_stores_id_fk"
+      columns: ["store_id"]
+isOneToOne: false
+      referencedRelation: "stores"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"stock_count_line_books": {
                   Row: {
                     "book_quantity": number | null,"item_id": string | null,"stock_count_id": string | null
@@ -689,6 +767,9 @@ isOneToOne: false
                            },
 "has_store_role":
 { Args: { "p_roles": (Database["public"]['Enums']["member_role"])[],"p_store_id": string }; Returns: boolean
+                           },
+"import_sales":
+{ Args: { "p_import_id": string,"p_rows": Json }; Returns: number
                            },
 "is_store_admin":
 { Args: { "p_store_id": string }; Returns: boolean

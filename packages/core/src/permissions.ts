@@ -17,6 +17,8 @@ const PERMISSIONS = {
   "sale:record": ["owner", "manager", "staff"],
   /** 판매 취소 (연결된 재료 차감도 함께 취소) */
   "sale:cancel": ["owner", "manager"],
+  /** 판매 파일(CSV) 가져오기·가져오기 취소, 메뉴 이름 매칭 */
+  "sale:import": ["owner", "manager"],
   /** 품목·카테고리·단위·메뉴·레시피 관리 */
   "catalog:manage": ["owner", "manager"],
   /** 거래처 관리 */

@@ -1,5 +1,5 @@
 import { can } from "@cafe/core";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileUp } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
@@ -87,6 +87,12 @@ export default async function SalesPage({ searchParams }: PageProps<"/sales">) {
             </Link>
           )}
         </nav>
+        {can(store.role, "sale:import") && (
+          <Link href="/sales/import" className={buttonVariants({ variant: "outline" })}>
+            <FileUp />
+            CSV 가져오기
+          </Link>
+        )}
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">

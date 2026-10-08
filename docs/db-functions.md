@@ -85,6 +85,35 @@ NestJS에서는 `SalesService.cancel()` 에서 같은 트랜잭션으로 지우�
 
 함께 바뀐 RLS: `sale_records` 의 INSERT 정책을 없앴다. 판매는 함수로만 기록한다.
 
+### `import_sales` — CSV 판매 가져오기
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261008055315_sale_import_functions.sql` (표는 `..._sale_imports.sql`, 합계 뷰는 `..._sale_import_summaries.sql`) |
+| 호출하는 곳 | `apps/web/src/lib/api/sale-imports.ts` `importSaleRows()` ← 화면 `/sales/import` 가 500건씩 나눠 부른다 |
+| NestJS 대응 | `SalesService.import()` (예정). `record_sales` 와 같은 차감 로직을 쓴다 |
+| 권한 | 사장·매니저 (`sale:import`, 함수 안에서 `is_store_admin`) |
+| 잠금 | `record_sales` 와 같음 (재료 `items` id 순 `FOR UPDATE`) |
+| 쓰는 테이블 | `sale_records`(`source = 'csv'`, `external_id`, `import_id`), `stock_movements`(`sale`) |
+| core 대응 | 파일 읽기·행 키는 `sales-import.ts` (`readSaleRows`), 차감은 `saleDeductions` |
+| 내부 호출 | `stock_outflow` |
+
+입력: `p_import_id`(먼저 `sale_imports` 에 한 행을 만든다), `p_rows` = `[{"menu_id", "quantity", "amount"(없으면 가격 × 수량), "sold_at", "external_id"}]` (최대 500건)
+반환: 새로 넣은 판매 건수
+
+처리 순서
+1. 로그인, 가져오기가 있고 그 매장 사장·매니저인지, 행 수
+2. 모든 메뉴가 그 매장 것인지 (보관된 메뉴도 받는다: 지난 판매)
+3. 재료 품목 잠금 (id 순)
+4. 행마다: 수량(1~10000)·금액(≥0)·판매 시각(미래 불가)·키(1~300자) 검증 → `sale_records` INSERT **ON CONFLICT DO NOTHING** (`sale_records_external_key` = 매장·source·external_id) → 새로 들어간 행만 레시피 재료 차감
+5. 하나라도 실패하면 그 묶음 전체가 취소된다. 앞 묶음은 남지만, 같은 파일을 다시 올리면 키가 같아 남은 것만 들어간다
+
+`external_id` = 파일 내용으로 만든 행 키: `날짜|시각|주문번호|메뉴 이름|수량|금액#같은 내용 몇 번째`. 같은 파일·기간이 겹치는 파일을 다시 올려도 중복되지 않는다. 메뉴 매칭과 상관없는 값이라 매칭을 바꿔도 같다.
+판매 시각은 화면이 보낸 매장 시간대 날짜·시각을 서버 액션이 변환한다 (시각이 없으면 그 날 23:59:59, 오늘이면 지금).
+
+**가져오기 취소**는 `sale_imports` 한 행 삭제다 (`cancelSaleImport()`, RLS `sale_imports_delete`). `sale_records.import_id` → 판매 → 원장으로 cascade 된다. 판매 취소와 같은 원장 삭제 예외.
+메뉴 이름 매칭은 `menu_aliases`(매장·파일의 이름 → 메뉴, null 이면 가져오지 않음)에 직접 upsert 한다 (한 문장, 사장·매니저, 같은 매장 메뉴만).
+
 ### `start_stock_count` — 재고 실사 시작
 
 | | |
@@ -260,7 +289,8 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 | `items_prevent_base_unit_change` | `..._catalog_triggers.sql` | 입출고·레시피에 쓰인 품목의 기본 단위 변경 차단 | **유지 권장** (데이터 무결성 규칙). 서비스에서도 같은 확인을 해서 친절한 오류를 먼저 낸다 |
 | `stock_count_lines_set_counted` → `set_stock_count_line_counted()` | `..._stock_count_functions.sql` | 센 수량이 바뀌면 센 시각·센 사람 기록 (지우면 둘 다 null) | 서비스에서 같은 값을 직접 기록하거나 트리거 유지 |
 | `stores_validate` → `validate_store()` | `..._store_settings.sql` | 매장 이름 앞뒤 공백 제거·1~50자, 시간대가 `pg_timezone_names` 에 있는지 확인 (만들기·수정 모두) | **유지 권장.** 잘못된 시간대가 들어가면 모든 화면의 날짜 계산이 깨진다. 서비스에서도 core `isValidTimeZone` 으로 먼저 확인 |
-| `sale_records_broadcast_cancel` → `broadcast_sale_cancelled()` | `..._sale_cancel_broadcast.sql` | 판매가 지워지면 비공개 Realtime 채널 `store:<매장 id>` 로 `sale_cancelled` 방송 | 판매 취소 서비스가 게이트웨이로 직접 알리고 트리거·`realtime.messages` 정책을 지운다 |
+| `sale_records_broadcast_cancel` → `broadcast_sale_cancelled()` | `..._sale_cancel_broadcast.sql`, 조건은 `..._sale_import_functions.sql` | 판매가 지워지면 비공개 Realtime 채널 `store:<매장 id>` 로 `sale_cancelled` 방송. 가져오기로 들어온 판매(`import_id` 있음)는 건너뜀 | 판매 취소 서비스가 게이트웨이로 직접 알리고 트리거·`realtime.messages` 정책을 지운다 |
+| `sale_imports_broadcast_cancel` → `broadcast_sale_import_cancelled()` | `..._sale_import_functions.sql` | 가져오기를 지우면 판매마다가 아니라 한 번만 `sale_cancelled` 방송 | 가져오기 취소 서비스가 게이트웨이로 알린다 |
 
 함께 바뀐 권한
 - `stores`: 사장이 `name`·`timezone` 만 수정 (컬럼 권한, 정책 `stores_update`). 화면은 `/settings/store` (`store:manage`), API는 `stores.ts` `updateStore()` — 한 행이라 함수 없이 직접 쓴다
@@ -272,12 +302,13 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 |---|---|---|---|
 | Realtime 구독 | `apps/web/src/lib/api/realtime.ts` `subscribeStoreChanges()` → `components/realtime-refresh.tsx`, `subscribeStockCount()` → 실사 화면 | `stock_movements`, `items` 변경과 `sale_records` 추가(내 매장, RLS 적용)를 받아 화면을 새로고침. 필터가 걸린 구독에는 삭제 이벤트가 오지 않아, 판매 취소는 DB 트리거가 비공개 채널 `store:<id>` 로 방송한 것을 받는다 | 원장 기록·품목 변경 후 서비스가 이벤트를 내고, WebSocket/SSE 게이트웨이로 매장별 방송. `subscribeStoreChanges` 의 시그니처(매장 ID, 콜백 → 구독 해제 함수)는 그대로 두고 안만 바꾼다 |
 | 구독 대상 테이블 | `..._supabase_auth_rls.sql`, `..._record_sales.sql`, `..._stock_count_realtime.sql` 의 `ALTER PUBLICATION supabase_realtime` | stock_movements, items, sale_records, stock_count_lines 방송 | 게이트웨이로 옮기면 publication 에서 뺀다 |
+| 가져오기 합계 뷰 | `sale_import_summaries` (`sales.ts`) | 가져오기마다 남은 판매 건수·수량·금액·판매 기간 | 뷰는 그대로 쓴다 |
 | 재고 집계 뷰 | `item_stock_levels`, `lot_stock_levels`, `item_latest_costs`, `item_cost_changes` (`inventory.ts`), `stock_count_line_books` (`counts.ts`) | 원장 합계로 현재 재고·로트 잔량, 품목별 최근 입고 단가(메뉴 원가용), 품목별 가장 최근 단가 변동(직전 단가·바뀐 시각, 단가 알림용), 실사 줄의 센 시각 장부 | 뷰는 그대로 쓴다 (PostgreSQL 뷰, `security_invoker`) |
 
 ## 앞으로 추가할 함수 (예정)
 
 | 함수 | 하는 일 | core 대응 |
 |---|---|---|
-| POS/CSV 판매 가져오기 | `record_sales` 를 `source = 'pos'/'csv'`, `external_id` 로 중복 방지하며 호출 | `saleDeductions` |
+| POS 직접 연동 | `import_sales` 와 같은 방식(`source = 'pos'`, 주문 ID 를 `external_id` 로)으로 웹훅·주기 동기화 | `saleDeductions` |
 
 새 함수를 만들면 이 문서에 같은 형식으로 추가한다.

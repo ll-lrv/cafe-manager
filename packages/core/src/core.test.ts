@@ -5,6 +5,15 @@ import {
   costChangePercent,
   costRate,
   countAdjustments,
+  decodeCsv,
+  findHeaderRow,
+  guessColumns,
+  matchMenus,
+  parseCsv,
+  parseImportNumber,
+  parseSaleDateTime,
+  readSaleRows,
+  summarizeNames,
   isNotableCostChange,
   menuCostImpacts,
   dateInTimeZone,
@@ -345,5 +354,81 @@ describe("avt", () => {
     expect(s.uncountedCount).toBe(0);
     expect(avtSummary([avtLine({ ...milk, counted: false }, 2.8)], 0).uncountedCount).toBe(1);
     expect(sortAvtLines(lines).map((l) => l.itemId)).toEqual(["milk", "bean", "cup"]);
+  });
+});
+
+describe("sales import", () => {
+  it("CSV: 따옴표 안 쉼표·줄바꿈, 탭 구분, 빈 줄", () => {
+    expect(parseCsv('상품명,수량,금액\r\n"라떼, 아이스",2,"9,000"\n\n"줄\n바꿈",1,""""')).toEqual([
+      ["상품명", "수량", "금액"],
+      ["라떼, 아이스", "2", "9,000"],
+      ["줄\n바꿈", "1", '"'],
+    ]);
+    expect(parseCsv("a\tb\n1\t2")).toEqual([["a", "b"], ["1", "2"]]);
+  });
+
+  it("EUC-KR 파일도 읽는다", () => {
+    // "라떼" (EUC-KR: B6F3 B6BC)
+    expect(decodeCsv(new Uint8Array([0xb6, 0xf3, 0xb6, 0xbc]))).toBe("라떼");
+    expect(decodeCsv(new TextEncoder().encode("﻿라떼"))).toBe("라떼");
+  });
+
+  it("열 이름으로 칸을 추측하고 제목 줄을 건너뛴다", () => {
+    const table = [
+      ["매출 리포트 2026-10-01 ~ 2026-10-07"],
+      ["주문번호", "판매일시", "상품명", "옵션", "수량", "상품가격", "실판매금액"],
+    ];
+    expect(findHeaderRow(table)).toBe(1);
+    expect(guessColumns(table[1]!)).toEqual({ orderNo: 0, date: 1, menu: 2, option: 3, quantity: 4, amount: 6 });
+    expect(guessColumns(["일자", "메뉴", "판매수량", "판매금액"])).toEqual({ date: 0, menu: 1, quantity: 2, amount: 3 });
+  });
+
+  it("날짜·시각 여러 형식", () => {
+    expect(parseSaleDateTime("2026-10-07")).toEqual({ date: "2026-10-07", time: null });
+    expect(parseSaleDateTime("2026.10.07 13:05")).toEqual({ date: "2026-10-07", time: "13:05:00" });
+    expect(parseSaleDateTime("2026/10/07 오후 1:05:09")).toEqual({ date: "2026-10-07", time: "13:05:09" });
+    expect(parseSaleDateTime("2026년 10월 7일", "오전 12:30")).toEqual({ date: "2026-10-07", time: "00:30:00" });
+    expect(parseSaleDateTime("20261007")).toEqual({ date: "2026-10-07", time: null });
+    expect(parseSaleDateTime("2026-02-30")).toBeNull();
+    expect(parseSaleDateTime("10/07/2026")).toBeNull();
+    expect(parseImportNumber("₩4,500")).toBe(4500);
+    expect(parseImportNumber("(1,000)")).toBe(-1000);
+    expect(parseImportNumber("")).toBeNull();
+  });
+
+  it("행 읽기: 옵션 붙이기, 같은 내용 행 구분, 취소·합계 줄", () => {
+    const table = [
+      ["날짜", "상품명", "옵션", "수량", "금액"],
+      ["2026-10-07 09:00", "아메리카노", "ICE", "1", "4,500"],
+      ["2026-10-07 09:00", "아메리카노", "ICE", "1", "4,500"],
+      ["2026-10-07 09:10", "라떼", "", "-1", "-5,000"],
+      ["합계", "", "", "1", "4,000"],
+      ["어제", "라떼", "", "1", "5,000"],
+    ];
+    const { rows, issues } = readSaleRows(table, 0, guessColumns(table[0]!));
+    expect(rows.map((r) => [r.name, r.quantity, r.amount, r.time, r.key])).toEqual([
+      ["아메리카노 / ICE", 1, 4500, "09:00:00", "2026-10-07|09:00:00||아메리카노 / ICE|1|4500#1"],
+      ["아메리카노 / ICE", 1, 4500, "09:00:00", "2026-10-07|09:00:00||아메리카노 / ICE|1|4500#2"],
+    ]);
+    expect(issues).toEqual([
+      { line: 4, reason: "수량이 0 이하 (취소·반품)" },
+      { line: 5, reason: "합계 줄" },
+      { line: 6, reason: "날짜를 읽을 수 없음 (어제)" },
+    ]);
+    expect(summarizeNames(rows)).toEqual([{ name: "아메리카노 / ICE", rows: 2, quantity: 2 }]);
+  });
+
+  it("메뉴 매칭: 저장한 매칭 → 같은 이름", () => {
+    const menus = [
+      { id: "m1", name: "아이스 아메리카노" },
+      { id: "m2", name: "카페라떼" },
+    ];
+    expect(
+      matchMenus(["아이스아메리카노", "라떼(L)", "쿠폰", "카페라떼", "옛 메뉴"], menus, {
+        "라떼(L)": "m2",
+        쿠폰: null,
+        "옛 메뉴": "archived",
+      }),
+    ).toEqual({ 아이스아메리카노: "m1", "라떼(L)": "m2", 쿠폰: null, 카페라떼: "m2", "옛 메뉴": undefined });
   });
 });

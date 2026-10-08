@@ -16,6 +16,8 @@ export interface Sale {
   /** 판매 금액 합계, 원 */
   amount: number;
   soldAt: string;
+  /** 직접 입력, CSV 가져오기, POS */
+  source: "manual" | "csv" | "pos";
   createdByName: string | null;
 }
 
@@ -47,6 +49,7 @@ type SaleRow = {
   quantity: number;
   amount: number | null;
   sold_at: string;
+  source: "manual" | "csv" | "pos";
   menu: { name: string } | null;
   creator: { display_name: string } | null;
 };
@@ -56,7 +59,7 @@ export async function listSales(storeId: string, range: { from: string; to: stri
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sale_records")
-    .select("id, menu_id, quantity, amount, sold_at, menu:menus(name), creator:profiles(display_name)")
+    .select("id, menu_id, quantity, amount, sold_at, source, menu:menus(name), creator:profiles(display_name)")
     .eq("store_id", storeId)
     .gte("sold_at", range.from)
     .lt("sold_at", range.to)
@@ -70,6 +73,7 @@ export async function listSales(storeId: string, range: { from: string; to: stri
     quantity: s.quantity,
     amount: s.amount ?? 0,
     soldAt: s.sold_at,
+    source: s.source,
     createdByName: s.creator?.display_name ?? null,
   }));
 }

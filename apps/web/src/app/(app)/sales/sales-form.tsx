@@ -205,6 +205,7 @@ export function SaleList({ sales, canCancel, timeZone }: { sales: Sale[]; canCan
           <span className="text-sm font-medium">{sale.menuName}</span>
           <span className="text-sm tabular-nums">{sale.quantity.toLocaleString("ko-KR")}개</span>
           <span className="text-sm text-muted-foreground tabular-nums">{won(sale.amount)}</span>
+          {sale.source === "csv" && <Badge variant="outline">CSV</Badge>}
           <span className="w-full text-xs text-muted-foreground sm:w-auto">
             {timeFormat(timeZone).format(new Date(sale.soldAt))}
             {sale.createdByName && ` · ${sale.createdByName}`}

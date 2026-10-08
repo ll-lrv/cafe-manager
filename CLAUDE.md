@@ -13,8 +13,8 @@ Supabase로 MVP를 만들고, 이후 NestJS + PostgreSQL로 점진 전환할 계
 - `e2e` — 브라우저 E2E (`@playwright/test`), `.github/workflows/ci.yml` — CI
 
 ## 규칙
-- 재고는 `stock_movements` 원장 합계로 계산한다. 원장 행은 수정/삭제하지 않고 `adjust` 로 바로잡는다 (예외: 판매 취소 시 그 판매의 `sale` 원장은 cascade 로 함께 삭제)
-- 여러 행을 함께 쓰는 작업(입출고, 판매 차감, 실사 완료, 발주 입고)은 DB 함수로 묶어 한 트랜잭션으로 처리한다. 원장·로트는 함수로만 쓴다(직접 INSERT 정책 없음). 함수를 만들거나 바꾸면 `docs/db-functions.md`(NestJS 전환 대응표)를 함께 갱신한다
+- 재고는 `stock_movements` 원장 합계로 계산한다. 원장 행은 수정/삭제하지 않고 `adjust` 로 바로잡는다 (예외: 판매 취소·CSV 가져오기 취소 시 그 판매의 `sale` 원장은 cascade 로 함께 삭제)
+- 여러 행을 함께 쓰는 작업(입출고, 판매 차감, 판매 가져오기, 실사 완료, 발주 입고)은 DB 함수로 묶어 한 트랜잭션으로 처리한다. 원장·로트는 함수로만 쓴다(직접 INSERT 정책 없음). 함수를 만들거나 바꾸면 `docs/db-functions.md`(NestJS 전환 대응표)를 함께 갱신한다
 - 수량은 품목의 기본 단위(g/ml/ea) 기준. 입고 단위는 `item_units.factor` 로 환산
 - 금액은 원(KRW) 정수
 - 권한 표는 `packages/core/src/permissions.ts` 와 RLS 마이그레이션을 함께 맞춘다
