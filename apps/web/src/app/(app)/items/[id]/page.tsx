@@ -1,4 +1,4 @@
-import { can, formatQuantity, roundQty, stockStatus } from "@cafe/core";
+import { can, DEFAULT_LEAD_DAYS, daysUntilEmpty, formatQuantity, roundQty, runoutLabel, stockStatus } from "@cafe/core";
 import { ArrowRightLeft, CircleCheck } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -16,6 +16,8 @@ import { listSuppliers } from "@/lib/api/suppliers";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { buildCostAlerts, unitPriceText } from "@/lib/cost-alerts";
 import { storeToday, toLotView } from "@/lib/inventory";
+import { loadDailyUsage } from "@/lib/item-usage";
+import { itemReorderAdvice } from "@/lib/order-suggestions";
 import { MovementList } from "../../stock/movement-list";
 import { BackLink } from "../back-link";
 import { ArchiveItemButton, ItemForm, UnitsEditor } from "../item-forms";
@@ -31,9 +33,10 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
   ]);
   if (!item) notFound();
   const canViewCosts = can(store.role, "report:view");
-  const [inUse, stock, movements, lotLevels, costData] = await Promise.all([
+  const [inUse, stock, usageByItem, movements, lotLevels, costData] = await Promise.all([
     isItemInUse(item.id),
     getStockLevels(store.storeId),
+    loadDailyUsage(store.storeId, store.timeZone),
     listMovements(store.storeId, { itemId: item.id, limit: 10 }),
     item.trackExpiry ? listLotLevels(store.storeId, { itemId: item.id }) : Promise.resolve([]),
     canViewCosts
@@ -55,6 +58,10 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
   const withoutLot = roundQty(quantity - lots.reduce((sum, l) => sum + l.quantity, 0));
 
   const readOnly = !can(store.role, "catalog:manage");
+  // 최근 사용량으로 본 소진 예상과 발주 시점 (기본 거래처의 입고까지 걸리는 날 기준)
+  const usage = usageByItem[item.id] ?? null;
+  const supplier = suppliers.find((s) => s.id === item.defaultSupplierId);
+  const reorder = itemReorderAdvice(item, stock, usageByItem, supplier);
 
   return (
     <div className="grid gap-6">
@@ -92,6 +99,15 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
               </span>
             </CardTitle>
             {item.minStock > 0 && <CardDescription>부족 기준 {fmt(item.minStock)}</CardDescription>}
+            {usage && (
+              <CardDescription>
+                하루 평균 {fmt(usage.perDay)} 사용 (최근 {usage.days}일) ·{" "}
+                <span className={reorder.needed ? "font-medium text-destructive" : undefined}>
+                  {runoutLabel(daysUntilEmpty(quantity, usage.perDay))}
+                </span>
+                {reorder.needed && ` · 지금 발주할 때 (입고까지 ${supplier?.leadDays ?? DEFAULT_LEAD_DAYS}일)`}
+              </CardDescription>
+            )}
             <CardAction>
               <Link href={`/stock?item=${item.id}`} className={buttonVariants()}>
                 <ArrowRightLeft />

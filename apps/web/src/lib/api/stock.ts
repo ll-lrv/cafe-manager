@@ -159,3 +159,23 @@ export async function listLotLevels(storeId: string, { itemId }: { itemId?: stri
       : [],
   );
 }
+
+export interface ItemUsageTotal {
+  itemId: string;
+  /** 기간 동안 판매·사용으로 나간 양 (기본 단위, 양수. 반품은 상계) */
+  used: number;
+  /** 기간 안에서 처음 판매·사용한 시각 (ISO). 그 전에도 기록이 있으면 기간 시작 */
+  firstUsedAt: string;
+}
+
+/** 기간(from 이상 to 미만, ISO) 동안 품목별 판매·사용량. 소진 예상일·발주 추천용 */
+export async function listItemUsage(storeId: string, range: { from: string; to: string }): Promise<ItemUsageTotal[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("item_usage_summary", {
+    p_store_id: storeId,
+    p_from: range.from,
+    p_to: range.to,
+  });
+  if (error) throw new ApiError(dbErrorMessage(error));
+  return data.map((r) => ({ itemId: r.item_id, used: Number(r.used), firstUsedAt: r.first_used_at }));
+}

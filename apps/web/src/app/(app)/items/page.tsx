@@ -7,20 +7,22 @@ import { listCategories, listItems } from "@/lib/api/catalog";
 import { getStockLevels, listLotLevels } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { buildItemLevels, storeToday } from "@/lib/inventory";
+import { loadDailyUsage } from "@/lib/item-usage";
 import { ItemList, type StatusFilter } from "./item-list";
 
 export const metadata: Metadata = { title: "품목·재고" };
 
 export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
   const [{ status }, store] = await Promise.all([searchParams, requireCurrentStore()]);
-  const [items, categories, stock, lots] = await Promise.all([
+  const [items, categories, stock, lots, usage] = await Promise.all([
     listItems(store.storeId),
     listCategories(store.storeId),
     getStockLevels(store.storeId),
     listLotLevels(store.storeId),
+    loadDailyUsage(store.storeId, store.timeZone),
   ]);
-  const levels = buildItemLevels(items, stock, lots, storeToday(store.timeZone));
-  const initialStatus: StatusFilter = status === "low" || status === "expiry" ? status : "all";
+  const levels = buildItemLevels(items, stock, lots, storeToday(store.timeZone), usage);
+  const initialStatus: StatusFilter = status === "low" || status === "runout" || status === "expiry" ? status : "all";
   const canManage = can(store.role, "catalog:manage");
 
   return (

@@ -19,7 +19,9 @@ import {
 } from "@/lib/api/purchasing";
 import { getStockLevels } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
+import { getSupplier } from "@/lib/api/suppliers";
 import { costNoticeAfterReceive } from "@/lib/cost-notice";
+import { loadDailyUsage } from "@/lib/item-usage";
 import { buildOrderSuggestions } from "@/lib/order-suggestions";
 
 /** 화면에서 숨겨도 요청은 직접 보낼 수 있으므로 서버에서 한 번 더 확인한다. (DB 함수·RLS가 최종 확인) */
@@ -45,14 +47,22 @@ function revalidateOrder(orderId?: string) {
   if (orderId) revalidatePath(`/orders/${orderId}`);
 }
 
-/** 거래처의 부족 품목을 추천 수량으로 담는다. 이미 담긴 품목은 건너뛴다. 반환: 담은 개수 */
-async function addSuggestedLines(storeId: string, orderId: string, supplierId: string, existing: string[]) {
-  const [items, stock, costs] = await Promise.all([
-    listItems(storeId),
-    getStockLevels(storeId),
-    getLatestCosts(storeId),
+/** 거래처의 추천 품목을 추천 수량으로 담는다. 이미 담긴 품목은 건너뛴다. 반환: 담은 개수 */
+async function addSuggestedLines(
+  store: { storeId: string; timeZone: string },
+  orderId: string,
+  supplierId: string,
+  existing: string[],
+) {
+  const [items, stock, costs, usage, supplier] = await Promise.all([
+    listItems(store.storeId),
+    getStockLevels(store.storeId),
+    getLatestCosts(store.storeId),
+    loadDailyUsage(store.storeId, store.timeZone),
+    getSupplier(store.storeId, supplierId),
   ]);
-  const suggestions = buildOrderSuggestions(items, stock, costs, supplierId, existing);
+  if (!supplier) throw new ApiError("없는 거래처입니다.");
+  const suggestions = buildOrderSuggestions(items, stock, costs, usage, supplier, existing);
   if (suggestions.length > 0) await addOrderLines(orderId, suggestions);
   return suggestions.length;
 }
@@ -67,7 +77,7 @@ export async function createOrderAction(_prev: ActionState, formData: FormData):
       expectedOn: text(formData, "expectedOn") || null,
       memo: text(formData, "memo") || null,
     });
-    if (formData.get("addSuggested") === "on") await addSuggestedLines(store.storeId, orderId, supplierId, []);
+    if (formData.get("addSuggested") === "on") await addSuggestedLines(store, orderId, supplierId, []);
   } catch (e) {
     return toActionError(e);
   }
@@ -115,15 +125,15 @@ export async function addSuggestedAction(_prev: ActionState, formData: FormData)
     const order = await getPurchaseOrder(store.storeId, text(formData, "orderId"));
     if (!order) throw new ApiError("발주서를 찾을 수 없습니다.");
     const added = await addSuggestedLines(
-      store.storeId,
+      store,
       order.id,
       order.supplierId,
       order.lines.map((l) => l.itemId),
     );
     revalidateOrder(order.id);
     return added > 0
-      ? { ok: true, message: `부족 품목 ${added}개를 담았습니다.` }
-      : { ok: true, message: "더 담을 부족 품목이 없습니다." };
+      ? { ok: true, message: `추천 품목 ${added}개를 담았습니다.` }
+      : { ok: true, message: "더 담을 추천 품목이 없습니다." };
   } catch (e) {
     return toActionError(e);
   }

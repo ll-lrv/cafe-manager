@@ -25,6 +25,8 @@ function readInput(formData: FormData): SupplierInput {
     phone: text(formData, "phone") || null,
     email: text(formData, "email") || null,
     memo: text(formData, "memo") || null,
+    leadDays: Number(text(formData, "leadDays")),
+    coverDays: Number(text(formData, "coverDays")),
   };
 }
 

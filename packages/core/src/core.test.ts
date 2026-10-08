@@ -48,6 +48,10 @@ import {
   stockStatus,
   suggestOrderQuantity,
   zonedTimeToUtc,
+  dailyUsage,
+  daysUntilEmpty,
+  reorderAdvice,
+  runoutLabel,
   toBaseQuantity,
   toBaseUnitCost,
 } from "./index";
@@ -604,5 +608,44 @@ describe("sales import options", () => {
       { name: "ICE", rows: 2 },
       { name: "샷추가", rows: 1 },
     ]);
+  });
+});
+
+describe("usage", () => {
+  it("하루 평균 사용량: 기록이 있는 날까지만, 최대 14일", () => {
+    expect(dailyUsage(2800, "2026-09-01", "2026-10-09")).toEqual({ perDay: 200, days: 14 });
+    // 5일 전부터 쓰기 시작했으면 5일로 나눈다
+    expect(dailyUsage(1000, "2026-10-04", "2026-10-09")).toEqual({ perDay: 200, days: 5 });
+    // 3일이 안 되거나 쓴 양이 없으면 모른다
+    expect(dailyUsage(1000, "2026-10-07", "2026-10-09")).toBeNull();
+    expect(dailyUsage(0, "2026-09-01", "2026-10-09")).toBeNull();
+    expect(dailyUsage(-50, "2026-09-01", "2026-10-09")).toBeNull();
+    expect(dailyUsage(500, null, "2026-10-09")).toBeNull();
+  });
+
+  it("소진 예상일", () => {
+    expect(daysUntilEmpty(1300, 200)).toBe(6);
+    expect(daysUntilEmpty(150, 200)).toBe(0);
+    expect(daysUntilEmpty(-30, 200)).toBe(0);
+    expect(runoutLabel(0)).toBe("오늘 소진");
+    expect(runoutLabel(4)).toBe("약 4일 뒤 소진");
+  });
+
+  it("사용량 기준 발주 추천: 입고까지 버티지 못하면 발주, 버틸 날까지 채운다", () => {
+    const base = { minStock: 1000, perDay: 200, leadDays: 2, coverDays: 7, factor: 1000 };
+    // 1,300 ≤ 1,000 + 200 × 2 → 발주. 1,000 + 200 × 9 − 1,300 = 1,500 → 2봉
+    expect(reorderAdvice({ ...base, current: 1300 })).toEqual({ needed: true, quantity: 2, basis: "usage" });
+    // 1,500 > 1,400 → 아직
+    expect(reorderAdvice({ ...base, current: 1500 }).needed).toBe(false);
+    // 마이너스 재고는 0으로 보고 채운다: 2,800 → 3봉
+    expect(reorderAdvice({ ...base, current: -200 })).toEqual({ needed: true, quantity: 3, basis: "usage" });
+    // 부족 기준 0 이어도 입고까지 쓸 양이 모자라면 발주
+    expect(reorderAdvice({ ...base, minStock: 0, current: 300 }).needed).toBe(true);
+  });
+
+  it("사용량을 모르면 예전처럼 부족 알림 기준 × 2", () => {
+    const advice = reorderAdvice({ current: 500, minStock: 2000, perDay: null, leadDays: 1, coverDays: 7, factor: 1000 });
+    expect(advice).toEqual({ needed: true, quantity: 4, basis: "min_stock" });
+    expect(reorderAdvice({ current: 2500, minStock: 2000, perDay: null, leadDays: 1, coverDays: 7 }).needed).toBe(false);
   });
 });

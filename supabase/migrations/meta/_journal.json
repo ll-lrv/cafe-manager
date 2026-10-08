@@ -225,6 +225,20 @@
       "when": 1791470990741,
       "tag": "20261008144950_import_sales_options",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791502137832,
+      "tag": "20261008232857_supplier_lead_days",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791502139603,
+      "tag": "20261008232859_item_usage",
+      "breakpoints": true
     }
   ]
 }

@@ -296,6 +296,21 @@ PostgREST 에서 집계(sum·group by)를 쓸 수 없어 함수로 둔 것이고
 (차이가 0 이라 조정 원장이 없어도 true. false 면 실사 차이를 모른다).
 실사 구간 리포트는 (앞 실사 완료 시각, 이번 실사 완료 시각] 으로 자른다. 실사 조정 원장이 완료 시각(`now()`)에 기록되기 때문.
 
+### `item_usage_summary` — 품목별 최근 사용량 (읽기 전용, 소진 예상일·발주 추천)
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261008232859_item_usage.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/stock.ts` `listItemUsage()` ← `lib/item-usage.ts` `loadDailyUsage()` → 대시보드, `/items`, `/items/[id]`, 발주 추천(`/orders/new`, `/orders/[id]`, 추천 담기 액션) |
+| NestJS 대응 | `StockService.itemUsage()` (예정). 같은 집계 SQL 을 그대로 쓰면 된다 |
+| 권한 | `SECURITY INVOKER` (RLS 그대로). 매장 구성원 |
+| core 대응 | `dailyUsage`, `daysUntilEmpty`, `reorderAdvice` (`usage.ts`, 계산은 모두 여기) |
+
+입력 `p_from` 이상 `p_to` 미만(`occurred_at`). 화면은 매장 시간대로 오늘을 뺀 최근 14일(`USAGE_WINDOW_DAYS`)을 넘긴다.
+품목별로 판매(`sale`)·사용(`consume`) 원장만 더해 `used`(양수, 반품은 상계)를 낸다. 폐기·조정·입고는 보지 않는다.
+`first_used_at` 은 기간 안의 첫 판매·사용 시각이고, 기간 전에도 판매·사용 기록이 있으면 `p_from` 이다.
+core `dailyUsage` 가 이 날부터 오늘까지의 날 수(최대 14일)로 나누고, 3일(`MIN_USAGE_DAYS`)보다 짧으면 평균을 내지 않는다.
+
 ### `menu_sales_summary` — 기간별 메뉴 판매 합계 (읽기 전용, 리포트)
 
 | | |

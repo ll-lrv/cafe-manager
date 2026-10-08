@@ -70,9 +70,9 @@ test("거래처·발주·입고 처리", async ({ app }) => {
   await test.step("3. 새 발주 + 부족 품목 바로 담기", async () => {
     await p.goto("/orders/new");
     await p.selectOption("#order-supplier", { label: "빈스서플" });
-    check("부족 품목 2개 (원두, 컵) 담기 안내", (await main(p)).includes("부족 품목 2개 바로 담기"));
+    check("추천 품목 2개 (원두, 컵) 담기 안내", (await main(p)).includes("추천 품목 2개 바로 담기"));
     await p.selectOption("#order-supplier", { label: "우유상회" });
-    check("거래처 바꾸면 추천 수 갱신 (우유 1개)", (await main(p)).includes("부족 품목 1개 바로 담기"));
+    check("거래처 바꾸면 추천 수 갱신 (우유 1개)", (await main(p)).includes("추천 품목 1개 바로 담기"));
     await p.selectOption("#order-supplier", { label: "빈스서플" });
     await p.fill("#order-expected", kstDate(2));
     await p.fill("#order-memo", "오전 배송 부탁");

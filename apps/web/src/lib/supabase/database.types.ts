@@ -725,14 +725,14 @@ isOneToOne: false
                   ]
                 },"suppliers": {
                   Row: {
-                    "archived_at": string | null,"contact_name": string | null,"created_at": string,"email": string | null,"id": string,"memo": string | null,"name": string,"phone": string | null,"store_id": string,"updated_at": string
+                    "archived_at": string | null,"contact_name": string | null,"cover_days": number,"created_at": string,"email": string | null,"id": string,"lead_days": number,"memo": string | null,"name": string,"phone": string | null,"store_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "archived_at"?: string | null,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"id"?: string,"memo"?: string | null,"name": string,"phone"?: string | null,"store_id": string,"updated_at"?: string
+                    "archived_at"?: string | null,"contact_name"?: string | null,"cover_days"?: number,"created_at"?: string,"email"?: string | null,"id"?: string,"lead_days"?: number,"memo"?: string | null,"name": string,"phone"?: string | null,"store_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "archived_at"?: string | null,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"id"?: string,"memo"?: string | null,"name"?: string,"phone"?: string | null,"store_id"?: string,"updated_at"?: string
+                    "archived_at"?: string | null,"contact_name"?: string | null,"cover_days"?: number,"created_at"?: string,"email"?: string | null,"id"?: string,"lead_days"?: number,"memo"?: string | null,"name"?: string,"phone"?: string | null,"store_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -912,6 +912,11 @@ isOneToOne: false
                            },
 "is_store_member":
 { Args: { "p_store_id": string }; Returns: boolean
+                           },
+"item_usage_summary":
+{ Args: { "p_from": string,"p_store_id": string,"p_to": string }; Returns: {
+              "first_used_at": string,"item_id": string,"used": number
+            }[]
                            },
 "menu_sales_summary":
 { Args: { "p_from": string,"p_store_id": string,"p_to": string }; Returns: {

@@ -1,6 +1,15 @@
 "use client";
 
-import { BASE_UNIT_LABEL, formatQuantity, formatUnitCount, orderTotal, roundQty, type PurchaseOrderStatus } from "@cafe/core";
+import {
+  BASE_UNIT_LABEL,
+  formatQuantity,
+  formatUnitCount,
+  MIN_USAGE_DAYS,
+  orderTotal,
+  roundQty,
+  USAGE_WINDOW_DAYS,
+  type PurchaseOrderStatus,
+} from "@cafe/core";
 import { Check, Copy, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -50,7 +59,7 @@ function orderQty(line: Pick<OrderLine, "unitName" | "baseUnit">, quantity: numb
 
 export function NewOrderForm({ suppliers, suggestionCounts, initialSupplierId }: {
   suppliers: Pick<Supplier, "id" | "name">[];
-  /** 거래처별 담을 수 있는 부족 품목 수 */
+  /** 거래처별 담을 수 있는 추천 품목 수 */
   suggestionCounts: Record<string, number>;
   initialSupplierId?: string;
 }) {
@@ -91,10 +100,12 @@ export function NewOrderForm({ suppliers, suggestionCounts, initialSupplierId }:
         />
         <span className="grid gap-0.5">
           <span className="font-medium">
-            {suggested > 0 ? `부족 품목 ${suggested}개 바로 담기` : "담을 부족 품목 없음"}
+            {suggested > 0 ? `추천 품목 ${suggested}개 바로 담기` : "담을 추천 품목 없음"}
           </span>
           <span className="text-xs text-muted-foreground">
-            기본 거래처가 이 거래처인 품목 중 재고가 없거나 부족한 것을, 부족 기준의 2배까지 채우는 수량으로 담습니다.
+            기본 거래처가 이 거래처인 품목 중 입고까지 버티지 못하는 것을, 최근 {USAGE_WINDOW_DAYS}일 하루 평균 사용량으로
+            (입고까지 걸리는 날 + 버틸 날) 동안 쓸 양만큼 담습니다. 사용 기록이 {MIN_USAGE_DAYS}일보다 짧은 품목은 부족 기준의
+            2배까지 채웁니다.
           </span>
         </span>
       </label>
@@ -274,7 +285,7 @@ export function DraftLines({ order, items, costs, suggestionCount }: {
   order: PurchaseOrder;
   items: OrderItemOption[];
   costs: Record<string, number>;
-  /** 더 담을 수 있는 부족 품목 수 */
+  /** 더 담을 수 있는 추천 품목 수 */
   suggestionCount: number;
 }) {
   const itemById = new Map(items.map((i) => [i.id, i]));
@@ -293,7 +304,7 @@ export function DraftLines({ order, items, costs, suggestionCount }: {
       )}
       {suggestionCount > 0 && (
         <ActionButton action={addSuggestedAction} fields={{ orderId: order.id }} variant="outline" pendingText="담는 중…">
-          부족 품목 {suggestionCount}개 담기
+          추천 품목 {suggestionCount}개 담기
         </ActionButton>
       )}
       <AddLineForm orderId={order.id} items={items} existingItemIds={order.lines.map((l) => l.itemId)} costs={costs} />

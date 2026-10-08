@@ -9,6 +9,10 @@ export interface Supplier {
   phone: string | null;
   email: string | null;
   memo: string | null;
+  /** 발주하고 입고까지 걸리는 날 */
+  leadDays: number;
+  /** 한 번 발주로 버틸 날 */
+  coverDays: number;
   archivedAt: string | null;
 }
 
@@ -18,9 +22,11 @@ export interface SupplierInput {
   phone: string | null;
   email: string | null;
   memo: string | null;
+  leadDays: number;
+  coverDays: number;
 }
 
-const SUPPLIER_SELECT = "id, name, contact_name, phone, email, memo, archived_at";
+const SUPPLIER_SELECT = "id, name, contact_name, phone, email, memo, lead_days, cover_days, archived_at";
 
 type SupplierRow = {
   id: string;
@@ -29,6 +35,8 @@ type SupplierRow = {
   phone: string | null;
   email: string | null;
   memo: string | null;
+  lead_days: number;
+  cover_days: number;
   archived_at: string | null;
 };
 
@@ -40,6 +48,8 @@ function toSupplier(r: SupplierRow): Supplier {
     phone: r.phone,
     email: r.email,
     memo: r.memo,
+    leadDays: r.lead_days,
+    coverDays: r.cover_days,
     archivedAt: r.archived_at,
   };
 }
@@ -49,6 +59,13 @@ function optional(value: string | null, label: string, max: number): string | nu
   if (!trimmed) return null;
   if (trimmed.length > max) throw new ApiError(`${label}은(는) ${max}자 이하로 입력해 주세요.`);
   return trimmed;
+}
+
+function wholeDays(value: number, label: string, min: number, max: number): number {
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new ApiError(`${label}은(는) ${min}~${max} 사이의 정수로 입력해 주세요.`);
+  }
+  return value;
 }
 
 function validate(input: SupplierInput) {
@@ -63,6 +80,8 @@ function validate(input: SupplierInput) {
     phone: optional(input.phone, "전화번호", 30),
     email,
     memo: optional(input.memo, "메모", 500),
+    lead_days: wholeDays(input.leadDays, "입고까지 걸리는 날", 0, 60),
+    cover_days: wholeDays(input.coverDays, "한 번 발주로 버틸 날", 1, 90),
   };
 }
 

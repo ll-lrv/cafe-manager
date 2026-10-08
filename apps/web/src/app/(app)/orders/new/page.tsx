@@ -9,6 +9,7 @@ import { getLatestCosts } from "@/lib/api/menus";
 import { getStockLevels } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { listSuppliers } from "@/lib/api/suppliers";
+import { loadDailyUsage } from "@/lib/item-usage";
 import { buildOrderSuggestions } from "@/lib/order-suggestions";
 import { NewOrderForm } from "../order-forms";
 
@@ -19,15 +20,16 @@ export default async function NewOrderPage({ searchParams }: PageProps<"/orders/
   if (!can(store.role, "purchase:manage")) {
     return <p className="text-sm text-muted-foreground">발주는 사장과 매니저만 할 수 있습니다.</p>;
   }
-  const [suppliers, items, stock, costs] = await Promise.all([
+  const [suppliers, items, stock, costs, usage] = await Promise.all([
     listSuppliers(store.storeId),
     listItems(store.storeId),
     getStockLevels(store.storeId),
     getLatestCosts(store.storeId),
+    loadDailyUsage(store.storeId, store.timeZone),
   ]);
   const active = suppliers.filter((s) => !s.archivedAt);
   const suggestionCounts = Object.fromEntries(
-    active.map((s) => [s.id, buildOrderSuggestions(items, stock, costs, s.id).length]),
+    active.map((s) => [s.id, buildOrderSuggestions(items, stock, costs, usage, s).length]),
   );
 
   return (

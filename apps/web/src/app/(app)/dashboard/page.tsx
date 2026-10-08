@@ -1,4 +1,13 @@
-import { can, COST_ALERT_DAYS, COST_ALERT_PERCENT, EXPIRY_SOON_DAYS, formatQuantity } from "@cafe/core";
+import {
+  can,
+  COST_ALERT_DAYS,
+  COST_ALERT_PERCENT,
+  EXPIRY_SOON_DAYS,
+  formatQuantity,
+  RUNOUT_SOON_DAYS,
+  runoutLabel,
+  USAGE_WINDOW_DAYS,
+} from "@cafe/core";
 import { ArrowRightLeft, ClipboardList, Receipt } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -6,6 +15,7 @@ import { CostAlertList } from "@/components/cost-alerts";
 import { ActionButton } from "@/components/form-parts";
 import { ExpiryBadge, StockStatusBadge } from "@/components/stock-badges";
 import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listItems } from "@/lib/api/catalog";
 import { listStockCounts } from "@/lib/api/counts";
@@ -15,8 +25,11 @@ import { listSales } from "@/lib/api/sales";
 import { getStockLevels, listLotLevels, listMovements } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { requireUser } from "@/lib/api/session";
+import { listSuppliers } from "@/lib/api/suppliers";
 import { buildCostAlerts } from "@/lib/cost-alerts";
 import { buildItemLevels, storeDayRange, storeToday, toLotView } from "@/lib/inventory";
+import { loadDailyUsage } from "@/lib/item-usage";
+import { itemReorderAdvice } from "@/lib/order-suggestions";
 import { overTargetMenus } from "../menus/menu-cost";
 import { OverTargetList } from "../menus/over-target-list";
 import { dayLabel } from "../orders/status";
@@ -43,9 +56,11 @@ export default async function DashboardPage() {
   const today = storeToday(store.timeZone);
   const canPurchase = can(store.role, "purchase:manage");
   const canViewCosts = can(store.role, "report:view");
-  const [items, stock, lotLevels, movements, todaySales, counts, incoming, costData] = await Promise.all([
+  const [items, stock, usage, suppliers, lotLevels, movements, todaySales, counts, incoming, costData] = await Promise.all([
     listItems(store.storeId),
     getStockLevels(store.storeId),
+    loadDailyUsage(store.storeId, store.timeZone),
+    listSuppliers(store.storeId),
     listLotLevels(store.storeId),
     listMovements(store.storeId, { limit: 5 }),
     listSales(store.storeId, storeDayRange(today, store.timeZone)),
@@ -67,7 +82,7 @@ export default async function DashboardPage() {
   const overTarget = costData ? overTargetMenus(costData[1], costData[2], store.targetCostRate) : [];
   const costAlerts = costData ? buildCostAlerts(costData[0], items, costData[1], costData[2], { storeTargetRate: store.targetCostRate }) : [];
   const itemById = new Map(activeItems.map((i) => [i.id, i]));
-  const levels = buildItemLevels(activeItems, stock, lotLevels, today);
+  const levels = buildItemLevels(activeItems, stock, lotLevels, today, usage);
   const fmt = (itemId: string, n: number) => {
     const item = itemById.get(itemId)!;
     return formatQuantity(n, item.baseUnit, item.units.find((u) => u.isDefaultPurchase) ?? null);
@@ -77,6 +92,18 @@ export default async function DashboardPage() {
   const lowItems = activeItems
     .filter((i) => levels[i.id]?.status !== "ok")
     .sort((a, b) => Number(levels[b.id]?.status === "out") - Number(levels[a.id]?.status === "out"));
+  // 아직 부족하진 않지만 최근 사용량으로 보면 곧 떨어질 품목 (빨리 떨어지는 순). 입고까지 버티지 못하면 "발주할 때"
+  const supplierById = new Map(suppliers.map((s) => [s.id, s]));
+  const runoutItems = activeItems
+    .filter((i) => {
+      const level = levels[i.id];
+      return level?.status === "ok" && level.runoutDays !== null && level.runoutDays <= RUNOUT_SOON_DAYS;
+    })
+    .sort((a, b) => levels[a.id]!.runoutDays! - levels[b.id]!.runoutDays!)
+    .map((item) => ({
+      item,
+      orderNow: itemReorderAdvice(item, stock, usage, supplierById.get(item.defaultSupplierId ?? "")).needed,
+    }));
   // 로트 단위로 지남·임박 (기한이 빠른 순으로 들어온다)
   const expiringLots = lotLevels
     .filter((l) => itemById.has(l.itemId))
@@ -211,6 +238,41 @@ export default async function DashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {runoutItems.length > 0 && (
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>곧 떨어질 품목 {runoutItems.length}개</CardTitle>
+                <CardDescription>
+                  최근 {USAGE_WINDOW_DAYS}일 하루 평균 사용량으로 보면 {RUNOUT_SOON_DAYS}일 안에 떨어질 품목 (부족한 품목 제외)
+                </CardDescription>
+                {canPurchase && runoutItems.some((r) => r.orderNow) && (
+                  <CardAction>
+                    <Link href="/orders/new" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                      발주하기
+                    </Link>
+                  </CardAction>
+                )}
+              </CardHeader>
+              <CardContent>
+                <ul className="divide-y">
+                  {runoutItems.slice(0, LIMIT).map(({ item, orderNow }) => (
+                    <li key={item.id}>
+                      <Link href={`/items/${item.id}`} className="flex items-center gap-2 py-2 text-sm hover:underline">
+                        <span className="min-w-0 truncate font-medium">{item.name}</span>
+                        <span className="shrink-0 text-muted-foreground">{runoutLabel(levels[item.id]!.runoutDays!)}</span>
+                        {orderNow && <Badge variant="destructive">발주할 때</Badge>}
+                        <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+                          {fmt(item.id, levels[item.id]!.quantity)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <MoreLink href="/items?status=runout" total={runoutItems.length} />
+              </CardContent>
+            </Card>
+          )}
 
           {costAlerts.length > 0 && (
             <Card className="md:col-span-2">

@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_COVER_DAYS, DEFAULT_LEAD_DAYS } from "@cafe/core";
 import { Archive, ArchiveRestore } from "lucide-react";
 import { ActionButton, Field, FormMessage, SubmitButton, useFormAction, useToastResult } from "@/components/form-parts";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ export function SupplierForm({ supplier, next }: { supplier?: Supplier; next?: s
       {s && <input type="hidden" name="supplierId" value={s.id} />}
       {next && <input type="hidden" name="next" value={next} />}
       {/* 저장된 값이 바뀌면 입력칸을 새로 그려 저장된 값을 보여준다. */}
-      <fieldset key={s && JSON.stringify([s.name, s.contactName, s.phone, s.email, s.memo])} className="grid gap-4 sm:grid-cols-2">
+      <fieldset key={s && JSON.stringify([s.name, s.contactName, s.phone, s.email, s.memo, s.leadDays, s.coverDays])} className="grid gap-4 sm:grid-cols-2">
         <Field label="거래처 이름" htmlFor="supplier-name">
           <Input id="supplier-name" name="name" defaultValue={s?.name} placeholder="예) 빈스서플라이" maxLength={50} required />
         </Field>
@@ -28,6 +29,12 @@ export function SupplierForm({ supplier, next }: { supplier?: Supplier; next?: s
         </Field>
         <Field label="이메일 (선택)" htmlFor="supplier-email">
           <Input id="supplier-email" name="email" type="email" defaultValue={s?.email ?? ""} maxLength={100} />
+        </Field>
+        <Field label="입고까지 걸리는 날" htmlFor="supplier-lead-days" hint="발주하고 물건이 오기까지. 당일 배송이면 0">
+          <DaysInput id="supplier-lead-days" name="leadDays" defaultValue={s?.leadDays ?? DEFAULT_LEAD_DAYS} min={0} max={60} />
+        </Field>
+        <Field label="한 번 발주로 버틸 날" htmlFor="supplier-cover-days" hint="다음 발주까지. 주 1회 발주면 7">
+          <DaysInput id="supplier-cover-days" name="coverDays" defaultValue={s?.coverDays ?? DEFAULT_COVER_DAYS} min={1} max={90} />
         </Field>
         <div className="sm:col-span-2">
           <Field label="메모 (선택)" htmlFor="supplier-memo">
@@ -42,6 +49,16 @@ export function SupplierForm({ supplier, next }: { supplier?: Supplier; next?: s
         </SubmitButton>
       </div>
     </form>
+  );
+}
+
+/** "일" 이 붙은 날 수 입력칸 */
+function DaysInput(props: React.ComponentProps<typeof Input>) {
+  return (
+    <div className="relative">
+      <Input type="number" inputMode="numeric" step={1} required {...props} className="pr-7 tabular-nums" />
+      <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-sm text-muted-foreground">일</span>
+    </div>
   );
 }
 

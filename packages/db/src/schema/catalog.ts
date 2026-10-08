@@ -39,11 +39,19 @@ export const suppliers = pgTable(
     phone: text("phone"),
     email: text("email"),
     memo: text("memo"),
+    /** 발주하고 입고까지 걸리는 날 (발주 추천: 이 날 동안 쓸 양이 남았을 때 발주) */
+    leadDays: integer("lead_days").notNull().default(1),
+    /** 한 번 발주로 버틸 날 (발주 추천 수량: 입고 뒤 이 날 동안 쓸 양까지 채운다) */
+    coverDays: integer("cover_days").notNull().default(7),
     archivedAt: archivedAt(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index("suppliers_store_idx").on(t.storeId)],
+  (t) => [
+    index("suppliers_store_idx").on(t.storeId),
+    check("suppliers_lead_days_check", sql`${t.leadDays} between 0 and 60`),
+    check("suppliers_cover_days_check", sql`${t.coverDays} between 1 and 90`),
+  ],
 );
 
 /** 재고 품목(원두, 우유, 컵 등). 메뉴(menus)와는 구분된다. */

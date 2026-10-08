@@ -1,6 +1,6 @@
 "use client";
 
-import { formatQuantity } from "@cafe/core";
+import { formatQuantity, RUNOUT_SOON_DAYS, runoutLabel } from "@cafe/core";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -11,11 +11,14 @@ import type { Category, Item } from "@/lib/api/catalog";
 import type { ItemLevel } from "@/lib/inventory";
 import { cn } from "@/lib/utils";
 
-/** all: 전체  low: 재고 없음·부족  expiry: 유통기한 지남·임박 */
-export type StatusFilter = "all" | "low" | "expiry";
+/** all: 전체  low: 재고 없음·부족  runout: 곧 소진(최근 사용량 기준)  expiry: 유통기한 지남·임박 */
+export type StatusFilter = "all" | "low" | "runout" | "expiry";
 
 function needsStock(level: ItemLevel | undefined) {
   return !!level && level.status !== "ok";
+}
+function runsOutSoon(level: ItemLevel | undefined) {
+  return level?.runoutDays != null && level.runoutDays <= RUNOUT_SOON_DAYS;
 }
 function needsExpiryCheck(level: ItemLevel | undefined) {
   return !!level && (level.expiry === "expired" || level.expiry === "soon");
@@ -55,6 +58,7 @@ export function ItemList({ items, categories, levels, initialStatus = "all" }: {
   const archivedCount = items.filter((i) => i.archivedAt).length;
   const hasUncategorized = items.some((i) => !i.categoryId && !i.archivedAt);
   const lowCount = items.filter((i) => needsStock(levels[i.id])).length;
+  const runoutCount = items.filter((i) => runsOutSoon(levels[i.id])).length;
   const expiryCount = items.filter((i) => needsExpiryCheck(levels[i.id])).length;
 
   const visible = useMemo(() => {
@@ -65,6 +69,7 @@ export function ItemList({ items, categories, levels, initialStatus = "all" }: {
         return false;
       }
       if (status === "low" && !needsStock(levels[item.id])) return false;
+      if (status === "runout" && !runsOutSoon(levels[item.id])) return false;
       if (status === "expiry" && !needsExpiryCheck(levels[item.id])) return false;
       return !q || item.name.toLowerCase().includes(q) || item.barcode?.includes(q);
     });
@@ -98,7 +103,7 @@ export function ItemList({ items, categories, levels, initialStatus = "all" }: {
         ))}
       </div>
 
-      {(lowCount > 0 || expiryCount > 0 || status !== "all") && (
+      {(lowCount > 0 || runoutCount > 0 || expiryCount > 0 || status !== "all") && (
         <div className="flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="재고 상태">
           <Chip active={status === "all"} onClick={() => setStatus("all")}>
             모든 상태
@@ -106,6 +111,11 @@ export function ItemList({ items, categories, levels, initialStatus = "all" }: {
           {(lowCount > 0 || status === "low") && (
             <Chip active={status === "low"} onClick={() => setStatus("low")}>
               부족·없음 {lowCount}
+            </Chip>
+          )}
+          {(runoutCount > 0 || status === "runout") && (
+            <Chip active={status === "runout"} onClick={() => setStatus("runout")}>
+              {RUNOUT_SOON_DAYS}일 안에 소진 {runoutCount}
             </Chip>
           )}
           {(expiryCount > 0 || status === "expiry") && (
@@ -127,6 +137,7 @@ export function ItemList({ items, categories, levels, initialStatus = "all" }: {
             const defaultUnit = item.units.find((u) => u.isDefaultPurchase) ?? null;
             const fmt = (n: number) => formatQuantity(n, item.baseUnit, defaultUnit);
             const details = [
+              level?.runoutDays != null && runoutLabel(level.runoutDays),
               item.minStock > 0 && `부족 기준 ${fmt(item.minStock)}`,
               level?.nextLot?.expiresOn && `가장 빠른 유통기한 ${level.nextLot.expiresOn}`,
             ].filter(Boolean);

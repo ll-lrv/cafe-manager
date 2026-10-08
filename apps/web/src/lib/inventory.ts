@@ -1,6 +1,8 @@
 import {
   dateInTimeZone,
+  daysUntilEmpty,
   daysUntilExpiry,
+  type DailyUsage,
   expiryStatus,
   stockStatus,
   type ExpiryStatus,
@@ -53,6 +55,10 @@ export interface ItemLevel {
   expiry: ExpiryStatus | null;
   /** 남은 로트 중 기한이 가장 빠른 것 */
   nextLot: LotView | null;
+  /** 최근 하루 평균 사용량. 기록이 짧거나 안 쓰면 null */
+  usage: DailyUsage | null;
+  /** 지금 재고로 버틸 날 (소진 예상). 사용량을 모르면 null */
+  runoutDays: number | null;
 }
 
 export function toLotView(lot: LotLevel, today: string): LotView {
@@ -60,12 +66,13 @@ export function toLotView(lot: LotLevel, today: string): LotView {
   return { ...lot, daysLeft, expiry: daysLeft === null ? null : expiryStatus(daysLeft) };
 }
 
-/** 품목별 재고·유통기한 상태. 보관된 품목은 빠진다. */
+/** 품목별 재고·유통기한 상태, 소진 예상(usage 를 주면). 보관된 품목은 빠진다. */
 export function buildItemLevels(
   items: Pick<Item, "id" | "minStock" | "archivedAt">[],
   stock: Record<string, number>,
   lots: LotLevel[],
   today: string,
+  usage: Record<string, DailyUsage> = {},
 ): Record<string, ItemLevel> {
   // lots 는 기한이 빠른 순으로 들어온다.
   const firstLot = new Map<string, LotView>();
@@ -78,7 +85,18 @@ export function buildItemLevels(
       .map((item) => {
         const quantity = stock[item.id] ?? 0;
         const nextLot = firstLot.get(item.id) ?? null;
-        return [item.id, { quantity, status: stockStatus(quantity, item.minStock), expiry: nextLot?.expiry ?? null, nextLot }];
+        const itemUsage = usage[item.id] ?? null;
+        return [
+          item.id,
+          {
+            quantity,
+            status: stockStatus(quantity, item.minStock),
+            expiry: nextLot?.expiry ?? null,
+            nextLot,
+            usage: itemUsage,
+            runoutDays: itemUsage ? daysUntilEmpty(quantity, itemUsage.perDay) : null,
+          },
+        ];
       }),
   );
 }
