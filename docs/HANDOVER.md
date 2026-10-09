@@ -452,6 +452,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-09 | `b22b8f7` | 소진 예상일·사용량 기반 발주 추천: 거래처 입고까지 걸리는 날·버틸 날, `item_usage_summary`, core `usage.ts`, 대시보드 "곧 떨어질 품목"·품목 소진 예상·발주 추천 수량 |
 | 10-09 | `960ef81` | 폐기 사유(필수, `waste_reason`)·폐기 리포트 `/reports/waste`: `waste_summary`, core `waste.ts`, `record_stock_movement`·`stock_outflow` 사유 인자 |
 | 10-09 | `de94260` | 발주 추천에서 이미 발주한(입고 예정) 수량 빼기: core `reorderAdvice` incoming, `incomingQuantities`·`loadIncoming`, 대시보드·품목 상세 "입고 예정" |
+| 10-09 | `007e69e` | 실사 뒤 소급 판매·취소 보정: 그 실사의 조정 원장으로 상쇄(로트 유지), 판매·가져오기 결과 안내 (전체 코드 점검 1번) |
 
 ---
 
