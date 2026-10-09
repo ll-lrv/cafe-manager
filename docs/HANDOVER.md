@@ -1,6 +1,6 @@
 # 인수인계 문서 — cafe-manager
 
-작성일: 2026-10-06 · 최종 갱신: 2026-10-09 · 기준 커밋: (이번 커밋) (main)
+작성일: 2026-10-06 · 최종 갱신: 2026-10-09 · 기준 커밋: `960ef81` (main)
 
 이 문서 하나로 프로젝트를 이어받을 수 있게 정리했다. 세부 기록은 아래 문서에 있다.
 
@@ -446,7 +446,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-08 | `db39ee4` | 메뉴 옵션 차감 1단계: 옵션·재료 규칙(추가·바꾸기·늘리기), 판매 입력 옵션 묶음 줄, `sale_ingredients`, 메뉴 수익성 재료비 반영 |
 | 10-09 | `ab4743c` | 메뉴 옵션 차감 2단계: CSV 옵션 열 낱말 매칭(옵션/메뉴 이름에 붙임/무시, `option_aliases`), `import_sales` 옵션 차감 |
 | 10-09 | `b22b8f7` | 소진 예상일·사용량 기반 발주 추천: 거래처 입고까지 걸리는 날·버틸 날, `item_usage_summary`, core `usage.ts`, 대시보드 "곧 떨어질 품목"·품목 소진 예상·발주 추천 수량 |
-| 10-09 | (이번 커밋) | 폐기 사유(필수, `waste_reason`)·폐기 리포트 `/reports/waste`: `waste_summary`, core `waste.ts`, `record_stock_movement`·`stock_outflow` 사유 인자 |
+| 10-09 | `960ef81` | 폐기 사유(필수, `waste_reason`)·폐기 리포트 `/reports/waste`: `waste_summary`, core `waste.ts`, `record_stock_movement`·`stock_outflow` 사유 인자 |
 
 ---
 
