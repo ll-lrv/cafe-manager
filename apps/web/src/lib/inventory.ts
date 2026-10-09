@@ -112,3 +112,20 @@ export function activeItemsInCategoryOrder<T extends Pick<Item, "name" | "catego
     .filter((i) => !i.archivedAt)
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "ko"));
 }
+
+/**
+ * 마지막 실사보다 이전 시각의 판매를 기록·취소했을 때의 안내.
+ * 그 실사에서 센 품목은 실사 수량에 이미 반영돼 있어 재고를 바꾸지 않는다 (DB 트리거가 실사 조정으로 상쇄).
+ */
+export function countedBeforeNotice(
+  lastCountAt: string | null,
+  soldAt: string,
+  timeZone: string,
+  kind: "record" | "cancel",
+): string | undefined {
+  if (!lastCountAt || Date.parse(soldAt) >= Date.parse(lastCountAt)) return undefined;
+  const day = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone }).format(new Date(lastCountAt));
+  return kind === "record"
+    ? `실사(${day}) 이전 판매라, 그 실사에서 센 품목의 재고는 빼지 않았습니다. 이미 센 수량에 반영돼 있습니다. 매출과 리포트에는 들어갑니다.`
+    : `실사(${day}) 이전 판매라, 그 실사에서 센 품목의 재고는 되돌리지 않았습니다. 이미 센 수량에 반영돼 있습니다.`;
+}

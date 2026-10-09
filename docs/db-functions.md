@@ -151,6 +151,8 @@ A→B, B→C 가 함께 있어도 A 가 C 로 가지 않는다. 같은 재료를
 
 ### `complete_stock_count` — 재고 실사 완료
 
+> 실사가 끝난 뒤에 그 이전 시각의 판매가 기록·취소되면 트리거가 이 실사의 조정으로 상쇄한다 (아래 "트리거" 표의 `stock_movements_backdated_sale_*`, `stock_movements_counted_sale_delete`).
+
 | | |
 |---|---|
 | 마이그레이션 | `supabase/migrations/20261006043120_stock_count_functions.sql` |
@@ -354,6 +356,8 @@ RLS 정책과 위 함수들이 쓰는 도우미. NestJS에서는 Guard + `can()`
 | `stock_count_lines_set_counted` → `set_stock_count_line_counted()` | `..._stock_count_functions.sql` | 센 수량이 바뀌면 센 시각·센 사람 기록 (지우면 둘 다 null) | 서비스에서 같은 값을 직접 기록하거나 트리거 유지 |
 | `stores_validate` → `validate_store()` | `..._store_settings.sql` | 매장 이름 앞뒤 공백 제거·1~50자, 시간대가 `pg_timezone_names` 에 있는지 확인 (만들기·수정 모두) | **유지 권장.** 잘못된 시간대가 들어가면 모든 화면의 날짜 계산이 깨진다. 서비스에서도 core `isValidTimeZone` 으로 먼저 확인 |
 | `sale_records_broadcast_cancel` → `broadcast_sale_cancelled()` | `..._sale_cancel_broadcast.sql`, 지금 내용은 `..._sale_cancel_keys.sql` | 판매가 지워지면 비공개 Realtime 채널 `store:<매장 id>` 로 `sale_cancelled` 방송. 행 키(`external_id`)가 있으면 `cancelled_sale_keys` 에 남긴다. 가져오기 전체 취소의 cascade(그 `sale_imports` 행이 이미 없음)는 둘 다 건너뜀 | 판매 취소 서비스가 게이트웨이로 직접 알리고 취소한 키를 기록, 트리거·`realtime.messages` 정책을 지운다 |
+| `stock_movements_backdated_sale_before` → `backdated_sale_before_insert()`, `stock_movements_backdated_sale_after` → `backdated_sale_after_insert()` | `..._count_backdated_sales.sql` | 판매(`sale`) 원장이 **완료된 실사의 센 시각 이전** 시각으로 기록되면(실사 뒤의 지난 날짜 입력·CSV 가져오기·반품 줄): BEFORE 에서 로트를 비우고, AFTER 에서 반대 부호의 상쇄 원장(`adjust`, 그 실사 `stock_count_id`, 발생 시각 = 실사 완료 시각, 같은 `sale_record_id`)을 만든다. 상쇄 원장은 판매에 연결돼 판매 취소 때 함께 지워진다. 실사는 `count_covering_movement` (센 완료된 실사 중 센 시각이 판매 시각 이후인 가장 이른 것) | **유지하거나 판매 기록 서비스로 옮긴다.** 판매·가져오기 서비스가 원장을 쓸 때 같은 규칙을 적용 |
+| `stock_movements_counted_sale_delete` → `counted_sale_after_delete()` | `..._count_backdated_sales.sql` | 실사 장부에 들어 있던 판매 원장(그 실사 완료 전에 기록된 것)이 실사 뒤에 지워지면(판매 취소·가져오기 취소 cascade) 같은 양·같은 로트의 상쇄 원장을 그 실사에 남긴다. 판매가 실제로 지워진 경우만(원장만 직접 지우거나 매장째 지울 때는 안 함). cascade 는 사용자 권한으로 돌아 SECURITY DEFINER 로 쓴다 | 판매 취소 서비스가 같은 상쇄를 기록 |
 | `sale_imports_broadcast_cancel` → `broadcast_sale_import_cancelled()` | `..._sale_import_functions.sql` | 가져오기를 지우면 판매마다가 아니라 한 번만 `sale_cancelled` 방송 | 가져오기 취소 서비스가 게이트웨이로 알린다 |
 
 함께 바뀐 권한

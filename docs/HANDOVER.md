@@ -22,7 +22,7 @@
 | 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기(취소·반품 반영) → 메뉴 수익성 순위·목표 원가율(권장 판매가, 목표 넘음 알림) → 메뉴 옵션 차감(판매 입력·CSV 옵션 열) → 소진 예상일·사용량 기반 발주 추천 → 폐기 사유·폐기율 리포트** |
 | 저장소 | https://github.com/ll-lrv/cafe-manager (**공개**) |
 | CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 2026-10-08~09 push(`f9ca606`, `baf47a1`, `09f59bc`, `0991a5d`, `5921b8e`) 모두 통과 (`5921b8e`: 타입·lint·단위 40초 + E2E 16개 9분) |
-| 테스트 | core 단위 51개, 브라우저 E2E 16개 시나리오 (로컬 전체 통과, 2026-10-09) |
+| 테스트 | core 단위 51개, 브라우저 E2E 17개 시나리오 (로컬 전체 통과, 2026-10-09) |
 | 배포 | **아직 없음.** 로컬 Supabase(Docker)에서만 동작. 후보: Supabase 클라우드(서울) + Vercel (§10) |
 | 로컬 DB | 2026-10-07 에 비운 뒤 **데모 계정 하나**를 만들어 둠: `demo-owner@cafe.kr` / `test1234` ("데모 카페", 품목 3·메뉴 2·판매 65잔). 실사 기록은 없다 |
 | 다음 | **배포 + 시범 매장** (§10-5, 사용자 결정 필요) |
@@ -63,7 +63,7 @@ npx supabase start -x imgproxy,edge-runtime,logflare,vector,supavisor
 npx supabase status        # Publishable key 를 .env.local 의 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 에
 pnpm dev                   # http://localhost:3000
 ```
-- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 36개가 모두 적용된다.
+- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 37개가 모두 적용된다.
 - DB 보기: Supabase Studio http://127.0.0.1:55323 · 메일함(Mailpit) http://127.0.0.1:55324
 
 ### 이어서 작업할 때
@@ -115,8 +115,8 @@ apps/web                Next.js 16 (App Router)
   src/proxy.ts          (Next 16 의 middleware) 로그인 여부만 확인
 packages/core           순수 TS 비즈니스 로직 + 단위 테스트 (DB·프레임워크 의존 금지)
 packages/db             Drizzle 스키마 (스키마 변경은 반드시 여기서)
-supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (36개)
-e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 16개
+supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (37개)
+e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 17개
 .github/workflows/ci.yml  CI (타입·lint·단위 테스트, Supabase + E2E)
 docs/                   이 문서, PROGRESS, db-functions
 ```
@@ -163,6 +163,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - **재고 마이너스 허용**: 기록이 늦게 들어오는 현실 때문. 화면에서 경고만 한다.
 - **유통기한(로트)**: `track_expiry` 품목은 입고 때 로트를 만들고, 나갈 때 기한이 빠른 로트부터 꺼낸다. 로트가 모자라면 나머지는 로트 없이 차감한다.
 - **실사 조정 기준 = 품목을 센 시각의 장부**: 세는 도중·센 뒤의 판매가 있어도 정확하다. (시작·완료 시점 비교가 아님)
+- **실사 뒤의 소급 판매**: 실사 뒤에 그 이전 시각의 판매가 기록·취소되면, 그 실사에서 센 품목은 재고가 실사 결과에서 벗어나지 않도록 그 실사의 조정 원장(`adjust`, `stock_count_id`, 발생 시각 = 실사 완료 시각, 메모 "실사 보정")으로 상쇄한다. 판매·매출·이론 사용량은 그대로 남고, 이론 vs 실제에서는 그 실사의 "실사에서 모자란 양"이 그만큼 바뀐다. 로트도 그대로다: 늦게 들어온 판매는 원장을 로트 없이 기록하고 상쇄도 로트 없이, 실사 장부에 있던 판매의 취소는 같은 로트로 상쇄. 붙이는 실사 = 그 품목을 센 완료된 실사 중 센 시각이 판매 시각 이후인 가장 이른 것. 트리거 `stock_movements_backdated_sale_before/after`, `stock_movements_counted_sale_delete` (`..._count_backdated_sales.sql`). 판매 입력·판매 취소·CSV 가져오기·가져오기 취소 결과에 "실사(10/8) 이전 판매라 ... 재고는 빼지(되돌리지) 않았습니다" 안내 (마지막 완료 실사 기준, `countedBeforeNotice`).
 - **메뉴 원가** = 레시피 사용량 × 재료의 최근 입고 단가(`item_latest_costs` 뷰). 단가를 넣지 않은 입고는 원가에 쓰이지 않는다.
 - **소진 예상·발주 추천**: 하루 평균 사용량 = 오늘을 뺀 최근 14일 판매(`sale`)·사용(`consume`) 합계(반품 상계, 폐기·조정 제외) ÷ 날 수. 처음 쓴 날이 14일 안이면 그 날부터 센다. 3일보다 짧거나 쓴 양이 없으면 모른다. 소진 예상 = 재고 ÷ 하루 평균(내림). **발주할 때** = 재고 ≤ 부족 알림 기준 + 하루 평균 × 입고까지 걸리는 날. **추천 수량** = 부족 알림 기준 + 하루 평균 × (입고까지 + 버틸 날) − 재고, 기본 입고 단위로 올림. 날 수는 품목의 기본 거래처 것(`suppliers.lead_days`·`cover_days`, 기본 1일·7일). 사용량을 모르는 품목은 예전처럼 부족 알림 기준 이하일 때 기준 × 2 까지. **이미 발주한 양을 뺀다**: 판단은 재고(마이너스는 0) + 입고 예정(발주함·일부 입고 상태 발주서의 남은 수량 × 단위, 작성 중 발주서는 제외)으로 한다 (`incomingQuantities`, `loadIncoming`). 품목 상세·대시보드에 "입고 예정" 표시. 계산은 core `usage.ts`, 합계는 DB `item_usage_summary`. 대시보드 "곧 떨어질 품목"은 부족 품목을 뺀 7일 안 소진 품목.
 - **매장 시간대**: "오늘"·하루의 경계·화면의 날짜와 시각은 `stores.timezone`(기본 Asia/Seoul)을 따른다. 지난 날짜 판매는 그 시간대의 23:59 로 기록. 시간대를 바꿔도 이미 기록된 시각은 그대로이고 보여주는 기준만 바뀐다. 페이지에서는 `requireCurrentStore()` 의 `timeZone` 을 쓴다.
@@ -205,7 +206,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 ## 7. DB
 
-### 마이그레이션 (적용 순서, 36개 — CI 가 매번 빈 DB에 처음부터 적용)
+### 마이그레이션 (적용 순서, 37개 — CI 가 매번 빈 DB에 처음부터 적용)
 | 파일 | 내용 |
 |---|---|
 | `20261003015300_init` | 전체 스키마 (Drizzle) |
@@ -232,6 +233,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `20261008144949_option_aliases`, `144950_import_sales_options` | CSV 옵션 열 낱말 매칭 표 `option_aliases`(RLS), `import_sales` 옵션 기록·차감 |
 | `20261008232857_supplier_lead_days`, `232859_item_usage` | 거래처 입고까지 걸리는 날(0~60)·버틸 날(1~90), 기간별 품목 판매·사용량 `item_usage_summary` |
 | `20261009000829_waste_reason`, `000832_waste_reason_functions` | 폐기 사유 enum·원장 칸(폐기 행에만 CHECK), `stock_outflow`·`record_stock_movement` 에 사유 인자(폐기는 필수, 기타는 메모 필수), 기간별 폐기 합계 `waste_summary` |
+| `20261009010931_count_backdated_sales` | 실사 뒤의 소급 판매·취소를 그 실사 조정으로 상쇄하는 트리거 3개 + `count_covering_movement` |
 
 ### DB 함수·트리거 (상세는 `docs/db-functions.md`)
 | 이름 | 하는 일 |
@@ -251,6 +253,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `menu_sales_summary` (읽기 전용, SECURITY INVOKER) | 기간별 메뉴·옵션 묶음 판매량·금액 합계 (반품 상계). 계산은 core `menu-profit.ts` |
 | 트리거 `prevent_item_base_unit_change` | 입출고·레시피·옵션 규칙에 쓰인 품목의 기본 단위 변경 차단 |
 | 트리거 `validate_store` | 매장 이름(공백 제거, 1~50자)·시간대(`pg_timezone_names`) 검사 |
+| 트리거 `backdated_sale_before/after_insert`, `counted_sale_after_delete` | 실사 뒤에 그 이전 시각의 판매가 기록·취소되면 그 실사의 조정 원장으로 상쇄 (재고·로트가 실사 결과 유지) |
 | 트리거 `broadcast_sale_cancelled` | 판매가 지워지면 `realtime.send` 로 매장 채널에 `sale_cancelled` 방송, 행 키가 있으면 `cancelled_sale_keys` 에 기록 (가져오기 전체 취소의 cascade 는 건너뛰고 `broadcast_sale_import_cancelled` 가 한 번만 방송) |
 
 ### 지켜야 할 DB 규칙
@@ -323,7 +326,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | core 단위 테스트 (vitest) | 51개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`(web·core·db·e2e), `pnpm lint`(web: Next 규칙, core·db: `typescript-eslint` 권장) 통과 |
 | DB 함수·정책 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
-| 브라우저 E2E | `e2e/tests/` 16개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동, 메뉴 수익성·목표 원가율, 메뉴 옵션(판매 입력·CSV 옵션 열), 소진 예상·발주 추천, 폐기 사유·폐기율. 로컬 약 7분(3개 병렬), CI 약 8분 |
+| 브라우저 E2E | `e2e/tests/` 17개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동, 메뉴 수익성·목표 원가율, 메뉴 옵션(판매 입력·CSV 옵션 열), 소진 예상·발주 추천, 폐기 사유·폐기율, 실사 뒤 소급 판매 보정. 로컬 약 7분(3개 병렬), CI 약 8분 |
 | CI | GitHub Actions 두 잡(`타입·lint·단위 테스트`, `브라우저 E2E`). 실패하면 실행 화면 Artifacts 의 `playwright-report` 를 받아 본다 |
 
 E2E 는 `@playwright/test` 다. 시나리오 하나가 테스트 하나이고 단계(`test.step`)로 나뉘며, 확인 항목은 `expect.soft` 라 하나가 실패해도 끝까지 돈다. 실패하면 한 번 재시도한다(재시도에서 통과하면 `flaky`).
@@ -383,7 +386,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 ### 5) 배포 — 시범 매장 전에 필요 (사용자 결정 필요)
 후보: **Supabase 클라우드(서울 리전) + Vercel**. Supabase·Vercel 계정 로그인은 사용자가 직접 해야 한다.
 - [ ] 정할 것: 환경 개수(운영만 / 운영+스테이징), 요금 등급, 주소(기본 `*.vercel.app` / 도메인)
-- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 36개)
+- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 37개)
 - [ ] 인증 설정: 가입 확인 메일 켜기(코드는 대비됨: 세션 없이 오면 확인 메일 안내), 사이트 주소·리디렉트 주소, 운영 SMTP
 - [ ] Vercel 프로젝트: GitHub 연결, 루트 `apps/web`, 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`), 함수 리전 서울
 - [ ] 배포 주소에서 가입~판매 직접 확인. 운영 DB에 E2E 를 돌리지 않는다 (테스트 계정이 생김) — 필요하면 스테이징에서

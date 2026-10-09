@@ -205,3 +205,22 @@ export async function cancelStockCount(storeId: string, countId: string) {
   if (error) throw new ApiError(dbErrorMessage(error));
   if (data.length === 0) throw new ApiError("권한이 없거나 이미 끝난 실사입니다.");
 }
+
+/**
+ * 가장 최근에 끝난 실사의 완료 시각 (ISO). 없으면 null.
+ * 이보다 이전 시각의 판매를 기록·취소하면 그 실사에서 센 품목의 재고는 DB 트리거가 실사 결과에 맞춰 상쇄한다
+ * (supabase/migrations/..._count_backdated_sales.sql). 화면 안내용
+ */
+export async function getLastCountCompletedAt(storeId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("stock_counts")
+    .select("completed_at")
+    .eq("store_id", storeId)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new ApiError(dbErrorMessage(error));
+  return data?.completed_at ?? null;
+}

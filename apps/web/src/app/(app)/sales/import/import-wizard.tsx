@@ -179,6 +179,8 @@ export function SalesImportWizard({
         optionIds: r.optionIds,
       }));
       let inserted = 0;
+      let beforeCount = 0;
+      let lastCountDay = "";
       for (let i = 0; i < payload.length; i += CHUNK) {
         setProgress(`가져오는 중… ${i.toLocaleString("ko-KR")} / ${payload.length.toLocaleString("ko-KR")}`);
         const result = await importChunkAction(started.importId, payload.slice(i, i + CHUNK));
@@ -194,6 +196,8 @@ export function SalesImportWizard({
           return;
         }
         inserted += result.inserted ?? 0;
+        beforeCount += result.beforeCount ?? 0;
+        lastCountDay = result.lastCountDay ?? lastCountDay;
       }
       setProgress(null);
       const skipped = payload.length - inserted;
@@ -204,9 +208,15 @@ export function SalesImportWizard({
         await cancelImportAction(undefined, form);
         toast.info("이 파일의 판매는 모두 이미 가져왔습니다.");
       } else {
+        const notes = [
+          skipped > 0 && `이미 가져온 ${skipped.toLocaleString("ko-KR")}건은 건너뛰었습니다.`,
+          beforeCount > 0 &&
+            `실사(${lastCountDay}) 이전 판매 ${beforeCount.toLocaleString("ko-KR")}줄은 그 실사에서 센 품목의 재고를 빼지 않았습니다. 이미 센 수량에 반영돼 있습니다. 매출과 리포트에는 들어갑니다.`,
+        ].filter(Boolean);
         toast.success(`${inserted.toLocaleString("ko-KR")}건을 가져왔습니다.`, {
-          description: skipped > 0 ? `이미 가져온 ${skipped.toLocaleString("ko-KR")}건은 건너뛰었습니다.` : undefined,
-          duration: 8_000,
+          description: notes.length > 0 ? notes.join("\n") : undefined,
+          duration: beforeCount > 0 ? 12_000 : 8_000,
+          classNames: { description: "whitespace-pre-line" },
         });
       }
       reset();

@@ -172,9 +172,16 @@ export async function listSaleImports(storeId: string, limit = 10): Promise<Sale
 /**
  * 가져오기를 취소한다. 그때 들어온 판매와 재료 차감이 DB에서 함께 지워진다(FK cascade).
  * 판매 취소와 같은 원장 삭제 예외. 사장·매니저만 (RLS sale_imports_delete)
+ * 반환: 지운 판매 중 가장 이른 판매 시각 (판매가 없었으면 null, 실사 안내용)
  */
-export async function cancelSaleImport(storeId: string, importId: string) {
+export async function cancelSaleImport(storeId: string, importId: string): Promise<{ firstSoldAt: string | null }> {
   const supabase = await createClient();
+  const { data: summary } = await supabase
+    .from("sale_import_summaries")
+    .select("first_sold_at")
+    .eq("store_id", storeId)
+    .eq("import_id", importId)
+    .maybeSingle();
   const { data, error } = await supabase
     .from("sale_imports")
     .delete()
@@ -184,4 +191,5 @@ export async function cancelSaleImport(storeId: string, importId: string) {
   if (error?.code === "22P02") throw new ApiError("없는 가져오기 기록입니다.");
   if (error) throw new ApiError(dbErrorMessage(error));
   if (data.length === 0) throw new ApiError("권한이 없거나 없는 가져오기 기록입니다.");
+  return { firstSoldAt: summary?.first_sold_at ?? null };
 }

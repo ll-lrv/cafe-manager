@@ -11,8 +11,9 @@ import {
   saveMenuAliases,
   saveOptionAliases,
 } from "@/lib/api/sale-imports";
+import { getLastCountCompletedAt } from "@/lib/api/counts";
 import { requireCurrentStore } from "@/lib/api/stores";
-import { isValidDate, storeEndOfDay, storeToday } from "@/lib/inventory";
+import { countedBeforeNotice, isValidDate, storeEndOfDay, storeToday } from "@/lib/inventory";
 
 /** 화면에서 숨겨도 요청은 직접 보낼 수 있으므로 서버에서 한 번 더 확인한다. (DB 함수·RLS가 최종 확인) */
 async function requireImporter() {
@@ -82,11 +83,14 @@ export async function startImportAction(
   }
 }
 
-/** 판매 행을 나눠 넣는다 (한 번에 IMPORT_CHUNK_SIZE 건). 반환: 새로 넣은 건수 (이미 가져온 행은 빠짐) */
+/**
+ * 판매 행을 나눠 넣는다 (한 번에 IMPORT_CHUNK_SIZE 건). 반환: 새로 넣은 건수 (이미 가져온 행은 빠짐),
+ * 마지막 실사보다 이전 시각의 행 수 (그 실사에서 센 품목의 재고는 바꾸지 않는다, 안내용)
+ */
 export async function importChunkAction(
   importId: string,
   rows: ImportRowInput[],
-): Promise<{ error?: string; inserted?: number }> {
+): Promise<{ error?: string; inserted?: number; beforeCount?: number; lastCountDay?: string }> {
   try {
     const store = await requireImporter();
     if (!Array.isArray(rows) || rows.length === 0 || rows.length > IMPORT_CHUNK_SIZE) {
@@ -113,9 +117,16 @@ export async function importChunkAction(
         optionIds: Array.isArray(r.optionIds) ? r.optionIds.map(String) : [],
       };
     });
-    const inserted = await importSaleRows(String(importId), converted);
+    const [inserted, lastCountAt] = await Promise.all([
+      importSaleRows(String(importId), converted),
+      getLastCountCompletedAt(store.storeId),
+    ]);
     revalidateSales();
-    return { inserted };
+    const beforeCount = lastCountAt ? converted.filter((r) => Date.parse(r.soldAt) < Date.parse(lastCountAt)).length : 0;
+    const lastCountDay = lastCountAt
+      ? new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone: store.timeZone }).format(new Date(lastCountAt))
+      : undefined;
+    return { inserted, beforeCount, lastCountDay };
   } catch (e) {
     return toActionError(e) ?? {};
   }
@@ -124,9 +135,12 @@ export async function importChunkAction(
 export async function cancelImportAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const store = await requireImporter();
-    await cancelSaleImport(store.storeId, String(formData.get("importId") ?? ""));
+    const { firstSoldAt } = await cancelSaleImport(store.storeId, String(formData.get("importId") ?? ""));
     revalidateSales();
-    return { ok: true, message: "가져오기를 취소했습니다. 그때 들어온 판매와 재료 차감을 되돌렸습니다." };
+    const notice = firstSoldAt
+      ? countedBeforeNotice(await getLastCountCompletedAt(store.storeId), firstSoldAt, store.timeZone, "cancel")
+      : undefined;
+    return { ok: true, message: "가져오기를 취소했습니다. 그때 들어온 판매와 재료 차감을 되돌렸습니다.", notice };
   } catch (e) {
     return toActionError(e);
   }

@@ -4,8 +4,9 @@ import { can } from "@cafe/core";
 import { revalidatePath } from "next/cache";
 import { ApiError, toActionError, type ActionState } from "@/lib/api/errors";
 import { cancelSale, recordSales, type SaleLine } from "@/lib/api/sales";
+import { getLastCountCompletedAt } from "@/lib/api/counts";
 import { requireCurrentStore } from "@/lib/api/stores";
-import { isValidDate, storeEndOfDay, storeToday } from "@/lib/inventory";
+import { countedBeforeNotice, isValidDate, storeEndOfDay, storeToday } from "@/lib/inventory";
 
 function revalidateSales() {
   revalidatePath("/sales");
@@ -44,7 +45,10 @@ export async function recordSalesAction(_prev: ActionState, formData: FormData):
     await recordSales(lines, soldAt);
     revalidateSales();
     const total = lines.reduce((sum, l) => sum + l.quantity, 0);
-    return { ok: true, message: `판매 ${total.toLocaleString("ko-KR")}개를 기록했습니다.` };
+    const notice = soldAt
+      ? countedBeforeNotice(await getLastCountCompletedAt(store.storeId), soldAt, store.timeZone, "record")
+      : undefined;
+    return { ok: true, message: `판매 ${total.toLocaleString("ko-KR")}개를 기록했습니다.`, notice };
   } catch (e) {
     return toActionError(e);
   }
@@ -54,9 +58,10 @@ export async function cancelSaleAction(_prev: ActionState, formData: FormData): 
   try {
     const store = await requireCurrentStore();
     if (!can(store.role, "sale:cancel")) throw new ApiError("판매 취소는 사장과 매니저만 할 수 있습니다.");
-    await cancelSale(store.storeId, String(formData.get("saleId") ?? ""));
+    const { soldAt } = await cancelSale(store.storeId, String(formData.get("saleId") ?? ""));
     revalidateSales();
-    return { ok: true, message: "판매를 취소했습니다. 차감된 재료도 되돌렸습니다." };
+    const notice = countedBeforeNotice(await getLastCountCompletedAt(store.storeId), soldAt, store.timeZone, "cancel");
+    return { ok: true, message: notice ? "판매를 취소했습니다." : "판매를 취소했습니다. 차감된 재료도 되돌렸습니다.", notice };
   } catch (e) {
     return toActionError(e);
   }

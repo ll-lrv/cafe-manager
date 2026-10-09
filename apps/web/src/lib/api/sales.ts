@@ -88,15 +88,16 @@ export async function listSales(storeId: string, range: { from: string; to: stri
  * 판매를 취소한다. 판매 기록을 지우면 연결된 재료 차감 원장도 DB에서 함께 지워진다(FK cascade).
  * 원장 삭제 금지 규칙의 유일한 예외. 사장·매니저만 (RLS sale_records_delete)
  */
-export async function cancelSale(storeId: string, saleId: string) {
+export async function cancelSale(storeId: string, saleId: string): Promise<{ soldAt: string }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("sale_records")
     .delete()
     .eq("store_id", storeId)
     .eq("id", saleId)
-    .select("id");
+    .select("id, sold_at");
   if (error?.code === "22P02") throw new ApiError("없는 판매 기록입니다.");
   if (error) throw new ApiError(dbErrorMessage(error));
   if (data.length === 0) throw new ApiError("권한이 없거나 없는 판매 기록입니다.");
+  return { soldAt: data[0]!.sold_at };
 }
