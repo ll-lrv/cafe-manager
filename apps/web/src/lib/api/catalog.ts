@@ -303,40 +303,31 @@ export async function addItemUnit(storeId: string, itemId: string, input: ItemUn
   const factor = roundQty(input.factor);
   if (factor <= 0) throw new ApiError("환산 수량이 너무 작습니다.");
 
+  const name = requireText(input.name, "단위 이름", 20);
+
+  // 먼저 기본이 아닌 단위로 넣고, 성공한 뒤에 기본으로 바꾼다. (넣기가 실패해도 기존 기본 단위가 그대로 남도록)
   const supabase = await createClient();
-  if (input.isDefaultPurchase) await clearDefaultPurchaseUnit(itemId);
-  const { error } = await supabase.from("item_units").insert({
-    item_id: itemId,
-    name: requireText(input.name, "단위 이름", 20),
-    factor,
-    is_default_purchase: input.isDefaultPurchase,
-  });
+  const { data, error } = await supabase
+    .from("item_units")
+    .insert({ item_id: itemId, name, factor, is_default_purchase: false })
+    .select("id")
+    .single();
   if (error) throw new ApiError(itemErrorMessage(error));
+  if (input.isDefaultPurchase) await switchDefaultPurchaseUnit(itemId, data.id);
 }
 
-async function clearDefaultPurchaseUnit(itemId: string) {
+/** 기본 입고 단위 바꾸기: 기존 기본 해제와 새 단위 지정을 DB 함수 하나(한 트랜잭션)로 */
+async function switchDefaultPurchaseUnit(itemId: string, unitId: string) {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("item_units")
-    .update({ is_default_purchase: false })
-    .eq("item_id", itemId)
-    .eq("is_default_purchase", true);
+  const { error } = await supabase.rpc("set_default_item_unit", { p_item_id: itemId, p_unit_id: unitId });
+  if (error?.code === "22P02") throw new ApiError("권한이 없거나 없는 단위입니다.");
   if (error) throw new ApiError(dbErrorMessage(error));
 }
 
 /** 기본 입고 단위는 품목당 하나. 입고 화면에서 처음 선택되는 단위다. */
 export async function setDefaultPurchaseUnit(storeId: string, itemId: string, unitId: string) {
   await requireStoreItem(storeId, itemId);
-  await clearDefaultPurchaseUnit(itemId);
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("item_units")
-    .update({ is_default_purchase: true })
-    .eq("item_id", itemId)
-    .eq("id", unitId)
-    .select("id");
-  if (error) throw new ApiError(dbErrorMessage(error));
-  if (data.length === 0) throw new ApiError("권한이 없거나 없는 단위입니다.");
+  await switchDefaultPurchaseUnit(itemId, unitId);
 }
 
 /** 지난 입출고 기록의 단위 표시는 사라지지만 수량(기본 단위)은 그대로 남는다. 발주서에 쓰인 단위는 지울 수 없다. */

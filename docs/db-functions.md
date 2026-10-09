@@ -328,6 +328,18 @@ core `dailyUsage` 가 이 날부터 오늘까지의 날 수(최대 14일)로 나
 입력 `p_from` 이상 `p_to` 미만(`occurred_at`). 폐기(`waste`) 원장을 품목·사유별로 더해 양수로 낸다. 사유 기능 전의 폐기는 사유가 NULL("사유 없음").
 폐기율의 분모(판매·사용·폐기로 나간 재료)는 `stock_usage_summary`, 매출은 `menu_sales_summary` 로 함께 읽는다.
 
+### `set_default_item_unit` — 기본 입고 단위 바꾸기
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261009014825_unit_default_member_fixes.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/catalog.ts` `setDefaultPurchaseUnit()`, `addItemUnit()`(기본으로 체크한 단위를 넣은 뒤) |
+| NestJS 대응 | `CatalogService.setDefaultUnit()` (예정). 한 트랜잭션으로 해제 → 지정 |
+| 권한 | `SECURITY INVOKER` — RLS `item_units_write`(사장·매니저). 막히면 0행이라 `권한이 없거나 없는 단위입니다.` |
+
+품목당 기본 단위는 하나(부분 유일 인덱스)라 지정보다 해제가 먼저여야 한다. 예전에는 화면 쪽에서 두 번 나눠 보내 두 번째가 실패하면 기본 단위가 없어졌다.
+단위 추가는 기본이 아닌 단위로 먼저 넣고, 성공하면 이 함수로 기본을 바꾼다 (넣기가 실패해도 기존 기본 단위가 남는다).
+
 ### `menu_sales_summary` — 기간별 메뉴 판매 합계 (읽기 전용, 리포트)
 
 | | |

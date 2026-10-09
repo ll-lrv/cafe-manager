@@ -893,6 +893,11 @@ isOneToOne: false
 "complete_stock_count":
 { Args: { "p_stock_count_id": string }; Returns: number
                            },
+"count_covering_movement":
+{ Args: { "p_item_id": string,"p_occurred_at": string }; Returns: {
+              "completed_at": string,"stock_count_id": string
+            }[]
+                           },
 "create_store":
 { Args: { "p_name": string }; Returns: string
                            },
@@ -936,6 +941,9 @@ isOneToOne: false
 { Args: { "p_menu_id": string,"p_option_ids": (string)[] }; Returns: {
               "item_id": string,"quantity": number
             }[]
+                           },
+"set_default_item_unit":
+{ Args: { "p_item_id": string,"p_unit_id": string }; Returns: undefined
                            },
 "start_stock_count":
 { Args: { "p_category_id"?: string,"p_memo"?: string,"p_store_id": string }; Returns: string

@@ -73,9 +73,14 @@ test("품목·카테고리·입고 단위", async ({ app }) => {
 
     await p.fill("#unit-name", "봉");
     await p.fill("#unit-factor", "500");
+    // 기본 입고 단위로 체크한 채 실패해도 기존 기본 단위(봉)는 그대로여야 한다
+    await p.check("#unit-default");
     await p.getByRole("button", { name: "단위 추가" }).click();
     await p.getByText("같은 이름의 단위가 이미 있습니다.").first().waitFor();
     check("단위 오류 후 입력값 유지", (await p.inputValue("#unit-factor")) === "500");
+    const kept = sql(`select string_agg(name, ',') from item_units where item_id = '${itemId}' and is_default_purchase`);
+    check("추가가 실패해도 기본 입고 단위는 그대로 (봉)", kept === "봉", kept);
+    await p.uncheck("#unit-default");
 
     await p.fill("#unit-name", "잘못");
     await p.fill("#unit-factor", "0");

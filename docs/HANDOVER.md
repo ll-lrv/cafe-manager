@@ -63,7 +63,7 @@ npx supabase start -x imgproxy,edge-runtime,logflare,vector,supavisor
 npx supabase status        # Publishable key 를 .env.local 의 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 에
 pnpm dev                   # http://localhost:3000
 ```
-- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 37개가 모두 적용된다.
+- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 38개가 모두 적용된다.
 - DB 보기: Supabase Studio http://127.0.0.1:55323 · 메일함(Mailpit) http://127.0.0.1:55324
 
 ### 이어서 작업할 때
@@ -115,7 +115,7 @@ apps/web                Next.js 16 (App Router)
   src/proxy.ts          (Next 16 의 middleware) 로그인 여부만 확인
 packages/core           순수 TS 비즈니스 로직 + 단위 테스트 (DB·프레임워크 의존 금지)
 packages/db             Drizzle 스키마 (스키마 변경은 반드시 여기서)
-supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (37개)
+supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (38개)
 e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 17개
 .github/workflows/ci.yml  CI (타입·lint·단위 테스트, Supabase + E2E)
 docs/                   이 문서, PROGRESS, db-functions
@@ -206,7 +206,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 ## 7. DB
 
-### 마이그레이션 (적용 순서, 37개 — CI 가 매번 빈 DB에 처음부터 적용)
+### 마이그레이션 (적용 순서, 38개 — CI 가 매번 빈 DB에 처음부터 적용)
 | 파일 | 내용 |
 |---|---|
 | `20261003015300_init` | 전체 스키마 (Drizzle) |
@@ -234,6 +234,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `20261008232857_supplier_lead_days`, `232859_item_usage` | 거래처 입고까지 걸리는 날(0~60)·버틸 날(1~90), 기간별 품목 판매·사용량 `item_usage_summary` |
 | `20261009000829_waste_reason`, `000832_waste_reason_functions` | 폐기 사유 enum·원장 칸(폐기 행에만 CHECK), `stock_outflow`·`record_stock_movement` 에 사유 인자(폐기는 필수, 기타는 메모 필수), 기간별 폐기 합계 `waste_summary` |
 | `20261009010931_count_backdated_sales` | 실사 뒤의 소급 판매·취소를 그 실사 조정으로 상쇄하는 트리거 3개 + `count_covering_movement` |
+| `20261009014825_unit_default_member_fixes` | 기본 입고 단위 바꾸기 함수 `set_default_item_unit`, 구성원 직접 추가 정책 삭제(초대 수락·매장 만들기로만), 구성원 수정은 `role` 칸만 |
 
 ### DB 함수·트리거 (상세는 `docs/db-functions.md`)
 | 이름 | 하는 일 |
@@ -245,6 +246,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `receive_purchase_order` / `change_purchase_order_status` | 발주 입고 / 허용된 상태 전환 |
 | `stock_outflow` (내부 전용) | 유통기한 순 차감 공용 로직 |
 | `create_store`, `accept_invitation`, `get_invitation` | 매장 만들기, 초대 |
+| `set_default_item_unit` (SECURITY INVOKER) | 기본 입고 단위 해제 → 지정을 한 트랜잭션으로 (RLS 그대로) |
 | `apply_store_template` | 카테고리·품목·입고 단위·메뉴·레시피를 한 트랜잭션으로 (같은 이름은 건너뜀, 사장·매니저) |
 | `import_sales` | CSV 판매 묶음(최대 500건) 기록 + 옵션을 반영한 재료 차감. 같은 행 키(`external_id`)는 건너뜀, 사장·매니저 |
 | `stock_usage_summary` (읽기 전용, SECURITY INVOKER) | 기간별 품목 원장 합계 + 그 기간에 센 품목인지. 집계만 하고 계산은 core `avt.ts` |
@@ -258,6 +260,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 ### 지켜야 할 DB 규칙
 - 원장(`stock_movements`)·로트·판매(+판매에 붙은 옵션)·실사 줄 생성·발주 상태와 입고 수량은 **함수로만** 쓴다. 직접 쓰는 정책·컬럼 권한이 없다.
+- 구성원(`store_members`)은 `create_store`·`accept_invitation` 으로만 생긴다 (직접 INSERT 정책·권한 없음). 수정은 사장이 `role` 칸만.
 - 한 행만 바꾸는 수정은 테이블에 직접 쓰되, 바꿀 수 있는 칸을 **컬럼 권한**으로 제한한다 (예: `stores` 는 `name`·`timezone`·`target_cost_rate` 만, `purchase_orders` 는 `supplier_id`·`expected_on`·`memo` 만).
 - 새 SECURITY DEFINER 함수는 함수 안에서 로그인·매장 구성원·역할을 직접 확인하고, `SET search_path = ''`, `REVOKE ... FROM PUBLIC, anon` + `GRANT ... TO authenticated` 를 지킨다.
 - 사용자에게 보여줄 오류는 `RAISE EXCEPTION '한국어 문장'`. 화면이 그대로 보여준다.
@@ -386,7 +389,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 ### 5) 배포 — 시범 매장 전에 필요 (사용자 결정 필요)
 후보: **Supabase 클라우드(서울 리전) + Vercel**. Supabase·Vercel 계정 로그인은 사용자가 직접 해야 한다.
 - [ ] 정할 것: 환경 개수(운영만 / 운영+스테이징), 요금 등급, 주소(기본 `*.vercel.app` / 도메인)
-- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 37개)
+- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 38개)
 - [ ] 인증 설정: 가입 확인 메일 켜기(코드는 대비됨: 세션 없이 오면 확인 메일 안내), 사이트 주소·리디렉트 주소, 운영 SMTP
 - [ ] Vercel 프로젝트: GitHub 연결, 루트 `apps/web`, 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`), 함수 리전 서울
 - [ ] 배포 주소에서 가입~판매 직접 확인. 운영 DB에 E2E 를 돌리지 않는다 (테스트 계정이 생김) — 필요하면 스테이징에서

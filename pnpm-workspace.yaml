@@ -7,3 +7,6 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
   esbuild: true
+
+minimumReleaseAgeExclude:
+  - drizzle-orm@0.45.4

@@ -157,6 +157,12 @@ export function SalesImportWizard({
     setInputKey((k) => k + 1);
   }
 
+  async function cancelEmptyImport(importId: string) {
+    const form = new FormData();
+    form.set("importId", importId);
+    await cancelImportAction(undefined, form);
+  }
+
   function runImport() {
     if (!file) return;
     startTransition(async () => {
@@ -186,6 +192,8 @@ export function SalesImportWizard({
         const result = await importChunkAction(started.importId, payload.slice(i, i + CHUNK));
         if (result.error) {
           setProgress(null);
+          // 하나도 들어가지 않았으면 빈 가져오기 기록을 남기지 않는다.
+          if (inserted === 0) await cancelEmptyImport(started.importId);
           router.refresh();
           toast.error(
             i === 0
@@ -203,9 +211,7 @@ export function SalesImportWizard({
       const skipped = payload.length - inserted;
       if (inserted === 0) {
         // 모두 이미 가져온 판매면 빈 가져오기 기록은 지운다.
-        const form = new FormData();
-        form.set("importId", started.importId);
-        await cancelImportAction(undefined, form);
+        await cancelEmptyImport(started.importId);
         toast.info("이 파일의 판매는 모두 이미 가져왔습니다.");
       } else {
         const notes = [
