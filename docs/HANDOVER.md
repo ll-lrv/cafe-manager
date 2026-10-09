@@ -1,6 +1,6 @@
 # 인수인계 문서 — cafe-manager
 
-작성일: 2026-10-06 · 최종 갱신: 2026-10-09 · 기준 커밋: `007e69e` (main)
+작성일: 2026-10-06 · 최종 갱신: 2026-10-09 · 기준 커밋: `9bd1782` (main)
 
 이 문서 하나로 프로젝트를 이어받을 수 있게 정리했다. 세부 기록은 아래 문서에 있다.
 
@@ -456,6 +456,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-09 | `960ef81` | 폐기 사유(필수, `waste_reason`)·폐기 리포트 `/reports/waste`: `waste_summary`, core `waste.ts`, `record_stock_movement`·`stock_outflow` 사유 인자 |
 | 10-09 | `de94260` | 발주 추천에서 이미 발주한(입고 예정) 수량 빼기: core `reorderAdvice` incoming, `incomingQuantities`·`loadIncoming`, 대시보드·품목 상세 "입고 예정" |
 | 10-09 | `007e69e` | 실사 뒤 소급 판매·취소 보정: 그 실사의 조정 원장으로 상쇄(로트 유지), 판매·가져오기 결과 안내 (전체 코드 점검 1번) |
+| 10-09 | `9bd1782` | 점검 2~5번: 기본 입고 단위 유실(`set_default_item_unit`), 초대 없는 구성원 추가 차단, 빈 가져오기 기록, drizzle-orm·shadcn 의존성 |
 
 ---
 
