@@ -12,7 +12,7 @@ import { getStockLevels } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { activeItemsInCategoryOrder } from "@/lib/inventory";
 import { getSupplier } from "@/lib/api/suppliers";
-import { loadDailyUsage } from "@/lib/item-usage";
+import { loadDailyUsage, loadIncoming } from "@/lib/item-usage";
 import { buildOrderSuggestions } from "@/lib/order-suggestions";
 import {
   CopyOrderButton,
@@ -48,18 +48,19 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
   const canReceive = order.status === "ordered" || order.status === "partially_received";
 
   // 작성 중일 때만 품목 선택지·추천이 필요하다.
-  const [items, categories, stock, costs, usage, supplier] = isDraft
+  const [items, categories, stock, costs, usage, incoming, supplier] = isDraft
     ? await Promise.all([
         listItems(store.storeId),
         listCategories(store.storeId),
         getStockLevels(store.storeId),
         getLatestCosts(store.storeId),
         loadDailyUsage(store.storeId, store.timeZone),
+        loadIncoming(store.storeId),
         getSupplier(store.storeId, order.supplierId),
       ])
-    : [[], [], {}, {}, {}, null];
+    : [[], [], {}, {}, {}, {}, null];
   const suggestionCount = supplier
-    ? buildOrderSuggestions(items, stock, costs, usage, supplier, order.lines.map((l) => l.itemId)).length
+    ? buildOrderSuggestions(items, stock, costs, usage, supplier, incoming, order.lines.map((l) => l.itemId)).length
     : 0;
 
   return (

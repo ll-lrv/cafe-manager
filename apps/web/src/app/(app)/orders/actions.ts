@@ -21,7 +21,7 @@ import { getStockLevels } from "@/lib/api/stock";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { getSupplier } from "@/lib/api/suppliers";
 import { costNoticeAfterReceive } from "@/lib/cost-notice";
-import { loadDailyUsage } from "@/lib/item-usage";
+import { loadDailyUsage, loadIncoming } from "@/lib/item-usage";
 import { buildOrderSuggestions } from "@/lib/order-suggestions";
 
 /** 화면에서 숨겨도 요청은 직접 보낼 수 있으므로 서버에서 한 번 더 확인한다. (DB 함수·RLS가 최종 확인) */
@@ -54,15 +54,16 @@ async function addSuggestedLines(
   supplierId: string,
   existing: string[],
 ) {
-  const [items, stock, costs, usage, supplier] = await Promise.all([
+  const [items, stock, costs, usage, incoming, supplier] = await Promise.all([
     listItems(store.storeId),
     getStockLevels(store.storeId),
     getLatestCosts(store.storeId),
     loadDailyUsage(store.storeId, store.timeZone),
+    loadIncoming(store.storeId),
     getSupplier(store.storeId, supplierId),
   ]);
   if (!supplier) throw new ApiError("없는 거래처입니다.");
-  const suggestions = buildOrderSuggestions(items, stock, costs, usage, supplier, existing);
+  const suggestions = buildOrderSuggestions(items, stock, costs, usage, supplier, incoming, existing);
   if (suggestions.length > 0) await addOrderLines(orderId, suggestions);
   return suggestions.length;
 }

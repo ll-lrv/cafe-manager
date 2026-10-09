@@ -22,10 +22,10 @@
 | 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기(취소·반품 반영) → 메뉴 수익성 순위·목표 원가율(권장 판매가, 목표 넘음 알림) → 메뉴 옵션 차감(판매 입력·CSV 옵션 열) → 소진 예상일·사용량 기반 발주 추천 → 폐기 사유·폐기율 리포트** |
 | 저장소 | https://github.com/ll-lrv/cafe-manager (**공개**) |
 | CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 2026-10-08~09 push(`f9ca606`, `baf47a1`, `09f59bc`, `0991a5d`) 모두 통과 (`0991a5d`: 타입·lint·단위 36초 + E2E 15개 8분) |
-| 테스트 | core 단위 50개, 브라우저 E2E 16개 시나리오 (로컬 전체 통과, 2026-10-09) |
+| 테스트 | core 단위 51개, 브라우저 E2E 16개 시나리오 (로컬 전체 통과, 2026-10-09) |
 | 배포 | **아직 없음.** 로컬 Supabase(Docker)에서만 동작. 후보: Supabase 클라우드(서울) + Vercel (§10) |
 | 로컬 DB | 2026-10-07 에 비운 뒤 **데모 계정 하나**를 만들어 둠: `demo-owner@cafe.kr` / `test1234` ("데모 카페", 품목 3·메뉴 2·판매 65잔). 실사 기록은 없다 |
-| 다음 | **배포 + 시범 매장** (§10-5, 사용자 결정 필요). 그 전에 할 수 있는 것: 발주 추천에서 입고 예정 수량 빼기 (§10-0) |
+| 다음 | **배포 + 시범 매장** (§10-5, 사용자 결정 필요) |
 
 ---
 
@@ -133,7 +133,7 @@ docs/                   이 문서, PROGRESS, db-functions
 ```
 
 ### packages/core 주요 함수
-단위 환산(`toBaseQuantity`, `formatQuantity`, `formatUnitCount`, `oneUnitLabel`), 레시피 차감(`saleDeductions`), 원가(`recipeCost`, `costRate`), FIFO(`allocateFifo`), 실사 조정(`countAdjustments`), 발주(`derivePurchaseOrderStatus`, `suggestOrderQuantity`, `orderTotal`), 재고·유통기한 상태(`stockStatus`, `expiryStatus`), 시간대(`dateInTimeZone`, `zonedTimeToUtc`, `isValidTimeZone`), 권한(`can`), 기본 템플릿 데이터(`CAFE_TEMPLATE`), 이론 vs 실제(`avtLine`, `avtSummary`, `sortAvtLines`), 단가 변동(`costChangePercent`, `isNotableCostChange`, `menuCostImpacts`, 기준 `COST_ALERT_PERCENT`·`COST_ALERT_DAYS`), 판매 파일 읽기(`decodeCsv`, `parseCsv`, `findHeaderRow`, `guessColumns`, `parseSaleDateTime`, `readSaleRows`, `matchMenus`), 메뉴 수익성(`suggestedPrice`, `effectiveTargetRate`, `isOverTarget`, `menuProfitLines`), 메뉴 옵션(`applyOptions`, `optionLineName`), CSV 옵션 열(`splitOptionNames`, `matchOptionWords`, `resolveOptionWords`, `summarizeOptionWords`), 사용량·발주 추천(`dailyUsage`, `daysUntilEmpty`, `runoutLabel`, `reorderAdvice`, 기준 `USAGE_WINDOW_DAYS`·`MIN_USAGE_DAYS`·`RUNOUT_SOON_DAYS`·`DEFAULT_LEAD_DAYS`·`DEFAULT_COVER_DAYS`), 폐기(`WASTE_REASONS`, `isWasteReason`, `wasteReasonLabel`, `wasteReport`). 테스트 50개.
+단위 환산(`toBaseQuantity`, `formatQuantity`, `formatUnitCount`, `oneUnitLabel`), 레시피 차감(`saleDeductions`), 원가(`recipeCost`, `costRate`), FIFO(`allocateFifo`), 실사 조정(`countAdjustments`), 발주(`derivePurchaseOrderStatus`, `suggestOrderQuantity`, `orderTotal`), 재고·유통기한 상태(`stockStatus`, `expiryStatus`), 시간대(`dateInTimeZone`, `zonedTimeToUtc`, `isValidTimeZone`), 권한(`can`), 기본 템플릿 데이터(`CAFE_TEMPLATE`), 이론 vs 실제(`avtLine`, `avtSummary`, `sortAvtLines`), 단가 변동(`costChangePercent`, `isNotableCostChange`, `menuCostImpacts`, 기준 `COST_ALERT_PERCENT`·`COST_ALERT_DAYS`), 판매 파일 읽기(`decodeCsv`, `parseCsv`, `findHeaderRow`, `guessColumns`, `parseSaleDateTime`, `readSaleRows`, `matchMenus`), 메뉴 수익성(`suggestedPrice`, `effectiveTargetRate`, `isOverTarget`, `menuProfitLines`), 메뉴 옵션(`applyOptions`, `optionLineName`), CSV 옵션 열(`splitOptionNames`, `matchOptionWords`, `resolveOptionWords`, `summarizeOptionWords`), 사용량·발주 추천(`dailyUsage`, `daysUntilEmpty`, `runoutLabel`, `reorderAdvice`, 기준 `USAGE_WINDOW_DAYS`·`MIN_USAGE_DAYS`·`RUNOUT_SOON_DAYS`·`DEFAULT_LEAD_DAYS`·`DEFAULT_COVER_DAYS`), 폐기(`WASTE_REASONS`, `isWasteReason`, `wasteReasonLabel`, `wasteReport`). 테스트 51개.
 DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기면 core 함수를 쓰고 SQL은 지운다.
 
 ---
@@ -164,7 +164,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - **유통기한(로트)**: `track_expiry` 품목은 입고 때 로트를 만들고, 나갈 때 기한이 빠른 로트부터 꺼낸다. 로트가 모자라면 나머지는 로트 없이 차감한다.
 - **실사 조정 기준 = 품목을 센 시각의 장부**: 세는 도중·센 뒤의 판매가 있어도 정확하다. (시작·완료 시점 비교가 아님)
 - **메뉴 원가** = 레시피 사용량 × 재료의 최근 입고 단가(`item_latest_costs` 뷰). 단가를 넣지 않은 입고는 원가에 쓰이지 않는다.
-- **소진 예상·발주 추천**: 하루 평균 사용량 = 오늘을 뺀 최근 14일 판매(`sale`)·사용(`consume`) 합계(반품 상계, 폐기·조정 제외) ÷ 날 수. 처음 쓴 날이 14일 안이면 그 날부터 센다. 3일보다 짧거나 쓴 양이 없으면 모른다. 소진 예상 = 재고 ÷ 하루 평균(내림). **발주할 때** = 재고 ≤ 부족 알림 기준 + 하루 평균 × 입고까지 걸리는 날. **추천 수량** = 부족 알림 기준 + 하루 평균 × (입고까지 + 버틸 날) − 재고, 기본 입고 단위로 올림. 날 수는 품목의 기본 거래처 것(`suppliers.lead_days`·`cover_days`, 기본 1일·7일). 사용량을 모르는 품목은 예전처럼 부족 알림 기준 이하일 때 기준 × 2 까지. 계산은 core `usage.ts`, 합계는 DB `item_usage_summary`. 대시보드 "곧 떨어질 품목"은 부족 품목을 뺀 7일 안 소진 품목.
+- **소진 예상·발주 추천**: 하루 평균 사용량 = 오늘을 뺀 최근 14일 판매(`sale`)·사용(`consume`) 합계(반품 상계, 폐기·조정 제외) ÷ 날 수. 처음 쓴 날이 14일 안이면 그 날부터 센다. 3일보다 짧거나 쓴 양이 없으면 모른다. 소진 예상 = 재고 ÷ 하루 평균(내림). **발주할 때** = 재고 ≤ 부족 알림 기준 + 하루 평균 × 입고까지 걸리는 날. **추천 수량** = 부족 알림 기준 + 하루 평균 × (입고까지 + 버틸 날) − 재고, 기본 입고 단위로 올림. 날 수는 품목의 기본 거래처 것(`suppliers.lead_days`·`cover_days`, 기본 1일·7일). 사용량을 모르는 품목은 예전처럼 부족 알림 기준 이하일 때 기준 × 2 까지. **이미 발주한 양을 뺀다**: 판단은 재고(마이너스는 0) + 입고 예정(발주함·일부 입고 상태 발주서의 남은 수량 × 단위, 작성 중 발주서는 제외)으로 한다 (`incomingQuantities`, `loadIncoming`). 품목 상세·대시보드에 "입고 예정" 표시. 계산은 core `usage.ts`, 합계는 DB `item_usage_summary`. 대시보드 "곧 떨어질 품목"은 부족 품목을 뺀 7일 안 소진 품목.
 - **매장 시간대**: "오늘"·하루의 경계·화면의 날짜와 시각은 `stores.timezone`(기본 Asia/Seoul)을 따른다. 지난 날짜 판매는 그 시간대의 23:59 로 기록. 시간대를 바꿔도 이미 기록된 시각은 그대로이고 보여주는 기준만 바뀐다. 페이지에서는 `requireCurrentStore()` 의 `timeZone` 을 쓴다.
 - **실시간 반영**: 다른 기기의 입출고·품목 변경·판매·판매 취소·실사 입력이 새로고침 없이 반영된다. 입력 중인 폼 값은 유지된다.
 - **삭제 대신 보관**: 품목·메뉴·거래처·옵션은 보관(archived_at)만 한다.
@@ -320,7 +320,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 | 종류 | 상태 |
 |---|---|
-| core 단위 테스트 (vitest) | 50개, `pnpm test` |
+| core 단위 테스트 (vitest) | 51개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`(web·core·db·e2e), `pnpm lint`(web: Next 규칙, core·db: `typescript-eslint` 권장) 통과 |
 | DB 함수·정책 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
 | 브라우저 E2E | `e2e/tests/` 16개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동, 메뉴 수익성·목표 원가율, 메뉴 옵션(판매 입력·CSV 옵션 열), 소진 예상·발주 추천, 폐기 사유·폐기율. 로컬 약 7분(3개 병렬), CI 약 8분 |
@@ -354,7 +354,8 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
   - 참고: WISK (메뉴 마진이 기준 아래로 떨어지면 알림), 키친코스트 (목표 원가율 → 판매가)
 - [x] **소진 예상일 + 판매량 기반 추천 발주** — 완료 (2026-10-09). 동작은 §5
   - 최근 14일 하루 평균 사용량(원장의 sale·consume)으로 "약 4일 뒤 소진"을 품목 목록·상세·대시보드에. 발주 추천을 "부족 기준 × 2" → 부족 기준 + 하루 평균 × (입고까지 + 버틸 날)로. 거래처에 입고까지 걸리는 날·버틸 날 칸
-  - 남은 것(필요하면): 입고 예정(발주했지만 안 들어온) 수량을 빼고 추천, 요일별 사용량(주말), 버틸 날을 품목별로, 사용 추이 그래프
+  - [x] 입고 예정(발주했지만 안 들어온) 수량을 빼고 추천 (2026-10-09)
+  - 남은 것(필요하면): 요일별 사용량(주말), 버틸 날을 품목별로, 사용 추이 그래프, 입고 예정일이 소진 예상일보다 늦으면 경고
   - CSV 가져오기로 판매 데이터가 쌓이면 의미가 생긴다. 매일 앱을 여는 이유가 되는 기능
   - 참고: 페이히어 (출고 데이터로 3·7·14일 뒤 품절 위험 예측), MarketMan (사용량 기반 추천 발주)
 
@@ -457,7 +458,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 - **메뉴 수익성의 재료비는 "지금" 레시피·단가 기준**: 기간 중 레시피나 단가가 바뀌었으면 그때의 실제 재료비와 다르다. 분류(효자 등)는 판매가 있는 메뉴끼리의 상대 비교라, 메뉴가 2~3개뿐이면 평균과 거의 같은 메뉴도 한쪽으로 나뉜다
 - **옵션**: 매장 단위라 어느 메뉴에나 붙일 수 있다(메뉴별 제한 없음). 같은 재료를 바꾸는 옵션 두 개(오트밀크·두유)를 함께 붙이면 하나만 적용된다(`item_id` 가 작은 쪽). 기본 템플릿에는 옵션이 없다. 메뉴 상세에는 옵션별 원가가 없고 옵션 상세의 "메뉴별 원가 변화"에서 본다
 - **CSV 옵션 개수는 1개로 친다**: "샷추가 x2" 처럼 옵션 뒤의 개수는 떼어 버린다. 실제 POS 파일 모양을 보고 정한다 (같은 옵션을 두 번 붙이는 것은 DB 가 막는다)
-- **소진 예상·발주 추천은 최근 14일 평균**이다: 요일(주말)·계절 변화, 새 메뉴로 갑자기 늘어난 사용량은 늦게 반영된다. **이미 발주해서 입고를 기다리는 수량은 빼지 않는다** — 발주한 품목도 들어오기 전까지 "발주할 때"로 보이고 새 발주서에 또 추천된다 (부족 기준 방식이던 예전과 같음). 판매·사용 기록이 3일보다 짧으면 예전처럼 부족 기준으로만 판단한다
+- **소진 예상·발주 추천은 최근 14일 평균**이다: 요일(주말)·계절 변화, 새 메뉴로 갑자기 늘어난 사용량은 늦게 반영된다. 이미 발주한 수량은 빼고 판단하지만 **입고 예정일은 보지 않는다** (발주가 늦게 들어와 그 전에 떨어져도 "발주할 때"로 다시 알리지 않는다). 판매·사용 기록이 3일보다 짧으면 예전처럼 부족 기준으로만 판단한다
 - 판매 화면·대시보드의 하루 매출은 아직 판매 기록을 한 줄씩 읽어 더한다 (API 최대 1,000행). 하루 1,000건을 넘는 매장이 생기면 `menu_sales_summary` 로 바꾼다
 - **리포트의 정확도는 판매 입력과 실사에 달렸다**: 판매를 빠뜨리면 이론이 줄어 차이가 커 보이고, 실사를 안 하면 기록 안 된 손실이 안 보인다 (화면에 안내함)
 - 기본 템플릿 메뉴의 양·가격은 예시값이다. 단가는 입고해야 생기므로 불러온 직후 원가는 0원

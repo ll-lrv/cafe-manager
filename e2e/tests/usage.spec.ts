@@ -88,4 +88,19 @@ test("소진 예상일·사용량 기반 발주 추천", async ({ app }) => {
     // 10 × (5 + 14) − 50 = 140개
     await expect(p.getByLabel("컵 수량")).toHaveValue("140");
   });
+
+  await test.step("6. 발주해 둔 양은 추천에서 뺀다", async () => {
+    await p.getByRole("button", { name: /발주하기/ }).click();
+    await p.getByText("발주했습니다.").waitFor();
+    // 원두 1,300 + 입고 예정 2,000 > 1,000 + 200 × 5, 컵 50 + 140 > 10 × 5
+    await p.goto("/orders/new");
+    check("담을 추천 품목 없음", (await main(p)).includes("담을 추천 품목 없음"), await main(p));
+    await p.goto(`/items/${bean}`);
+    const detail = await main(p);
+    check("품목 상세: 입고 예정, 발주할 때 아님", detail.includes("입고 예정 2봉") && !detail.includes("지금 발주할 때"), detail);
+    await p.goto("/dashboard");
+    const beanRow = await card(p).locator("li").filter({ hasText: "원두" }).innerText();
+    check("대시보드: 입고 예정 표시, 발주할 때 없음", beanRow.includes("입고 예정 2봉") && !beanRow.includes("발주할 때"), beanRow);
+    check("발주하기 링크 없음", (await card(p).getByRole("link", { name: "발주하기" }).count()) === 0);
+  });
 });

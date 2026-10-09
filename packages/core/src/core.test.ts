@@ -646,6 +646,20 @@ describe("usage", () => {
     expect(reorderAdvice({ ...base, minStock: 0, current: 300 }).needed).toBe(true);
   });
 
+  it("이미 발주해 둔 양(입고 예정)은 빼고 판단한다", () => {
+    const base = { minStock: 1000, perDay: 200, leadDays: 2, coverDays: 7, factor: 1000 };
+    // 1,300 + 입고 예정 1,000 = 2,300 > 1,400 → 발주 안 함
+    expect(reorderAdvice({ ...base, current: 1300, incoming: 1000 }).needed).toBe(false);
+    // 300 + 500 = 800 → 발주. 2,800 − 800 = 2,000 → 2봉
+    expect(reorderAdvice({ ...base, current: 300, incoming: 500 })).toEqual({ needed: true, quantity: 2, basis: "usage" });
+    // 마이너스 재고는 0으로 보고 더한다: 0 + 2,000 > 1,400
+    expect(reorderAdvice({ ...base, current: -500, incoming: 2000 }).needed).toBe(false);
+    // 사용량을 몰라도: 기준 2,000, 재고 500 + 입고 예정 2,000 → 충분
+    expect(reorderAdvice({ current: 500, minStock: 2000, perDay: null, leadDays: 1, coverDays: 7, incoming: 2000 }).needed).toBe(false);
+    expect(reorderAdvice({ current: 500, minStock: 2000, perDay: null, leadDays: 1, coverDays: 7, factor: 1000, incoming: 1000 }))
+      .toEqual({ needed: true, quantity: 3, basis: "min_stock" });
+  });
+
   it("사용량을 모르면 예전처럼 부족 알림 기준 × 2", () => {
     const advice = reorderAdvice({ current: 500, minStock: 2000, perDay: null, leadDays: 1, coverDays: 7, factor: 1000 });
     expect(advice).toEqual({ needed: true, quantity: 4, basis: "min_stock" });

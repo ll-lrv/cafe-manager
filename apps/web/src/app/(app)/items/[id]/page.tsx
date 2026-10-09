@@ -16,7 +16,7 @@ import { listSuppliers } from "@/lib/api/suppliers";
 import { requireCurrentStore } from "@/lib/api/stores";
 import { buildCostAlerts, unitPriceText } from "@/lib/cost-alerts";
 import { storeToday, toLotView } from "@/lib/inventory";
-import { loadDailyUsage } from "@/lib/item-usage";
+import { loadDailyUsage, loadIncoming } from "@/lib/item-usage";
 import { itemReorderAdvice } from "@/lib/order-suggestions";
 import { MovementList } from "../../stock/movement-list";
 import { BackLink } from "../back-link";
@@ -33,10 +33,11 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
   ]);
   if (!item) notFound();
   const canViewCosts = can(store.role, "report:view");
-  const [inUse, stock, usageByItem, movements, lotLevels, costData] = await Promise.all([
+  const [inUse, stock, usageByItem, incoming, movements, lotLevels, costData] = await Promise.all([
     isItemInUse(item.id),
     getStockLevels(store.storeId),
     loadDailyUsage(store.storeId, store.timeZone),
+    loadIncoming(store.storeId),
     listMovements(store.storeId, { itemId: item.id, limit: 10 }),
     item.trackExpiry ? listLotLevels(store.storeId, { itemId: item.id }) : Promise.resolve([]),
     canViewCosts
@@ -61,7 +62,8 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
   // 최근 사용량으로 본 소진 예상과 발주 시점 (기본 거래처의 입고까지 걸리는 날 기준)
   const usage = usageByItem[item.id] ?? null;
   const supplier = suppliers.find((s) => s.id === item.defaultSupplierId);
-  const reorder = itemReorderAdvice(item, stock, usageByItem, supplier);
+  const reorder = itemReorderAdvice(item, stock, usageByItem, supplier, incoming);
+  const comingQuantity = incoming[item.id] ?? 0;
 
   return (
     <div className="grid gap-6">
@@ -99,6 +101,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/ite
               </span>
             </CardTitle>
             {item.minStock > 0 && <CardDescription>부족 기준 {fmt(item.minStock)}</CardDescription>}
+            {comingQuantity > 0 && <CardDescription>입고 예정 {fmt(comingQuantity)} (발주했지만 아직 안 들어온 양)</CardDescription>}
             {usage && (
               <CardDescription>
                 하루 평균 {fmt(usage.perDay)} 사용 (최근 {usage.days}일) ·{" "}

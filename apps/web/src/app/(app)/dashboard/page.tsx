@@ -29,7 +29,7 @@ import { listSuppliers } from "@/lib/api/suppliers";
 import { buildCostAlerts } from "@/lib/cost-alerts";
 import { buildItemLevels, storeDayRange, storeToday, toLotView } from "@/lib/inventory";
 import { loadDailyUsage } from "@/lib/item-usage";
-import { itemReorderAdvice } from "@/lib/order-suggestions";
+import { incomingQuantities, itemReorderAdvice } from "@/lib/order-suggestions";
 import { overTargetMenus } from "../menus/menu-cost";
 import { OverTargetList } from "../menus/over-target-list";
 import { dayLabel } from "../orders/status";
@@ -56,7 +56,7 @@ export default async function DashboardPage() {
   const today = storeToday(store.timeZone);
   const canPurchase = can(store.role, "purchase:manage");
   const canViewCosts = can(store.role, "report:view");
-  const [items, stock, usage, suppliers, lotLevels, movements, todaySales, counts, incoming, costData] = await Promise.all([
+  const [items, stock, usage, suppliers, lotLevels, movements, todaySales, counts, openOrders, costData] = await Promise.all([
     listItems(store.storeId),
     getStockLevels(store.storeId),
     loadDailyUsage(store.storeId, store.timeZone),
@@ -65,13 +65,14 @@ export default async function DashboardPage() {
     listMovements(store.storeId, { limit: 5 }),
     listSales(store.storeId, storeDayRange(today, store.timeZone)),
     listStockCounts(store.storeId, 1),
-    canPurchase ? listPurchaseOrders(store.storeId, { statuses: ["ordered", "partially_received"] }) : Promise.resolve([]),
+    // 입고 예정 카드(사장·매니저)와 발주할 때 판단(입고 예정 수량을 뺀다)에 함께 쓴다. 발주서는 구성원 모두 읽을 수 있다
+    listPurchaseOrders(store.storeId, { statuses: ["ordered", "partially_received"] }),
     canViewCosts
       ? Promise.all([listCostChanges(store.storeId, { withinDays: COST_ALERT_DAYS }), listMenus(store.storeId), getLatestCosts(store.storeId)])
       : Promise.resolve(null),
   ]);
   // 입고 예정일 순 (없으면 뒤로)
-  const incomingSorted = [...incoming].sort((a, b) => (a.expectedOn ?? "9999").localeCompare(b.expectedOn ?? "9999"));
+  const incomingSorted = [...openOrders].sort((a, b) => (a.expectedOn ?? "9999").localeCompare(b.expectedOn ?? "9999"));
   const countInProgress = counts.find((c) => c.status === "in_progress");
   const todayCount = todaySales.reduce((sum, s) => sum + s.quantity, 0);
   const todayAmount = todaySales.reduce((sum, s) => sum + s.amount, 0);
@@ -94,6 +95,7 @@ export default async function DashboardPage() {
     .sort((a, b) => Number(levels[b.id]?.status === "out") - Number(levels[a.id]?.status === "out"));
   // 아직 부족하진 않지만 최근 사용량으로 보면 곧 떨어질 품목 (빨리 떨어지는 순). 입고까지 버티지 못하면 "발주할 때"
   const supplierById = new Map(suppliers.map((s) => [s.id, s]));
+  const incoming = incomingQuantities(openOrders);
   const runoutItems = activeItems
     .filter((i) => {
       const level = levels[i.id];
@@ -102,7 +104,8 @@ export default async function DashboardPage() {
     .sort((a, b) => levels[a.id]!.runoutDays! - levels[b.id]!.runoutDays!)
     .map((item) => ({
       item,
-      orderNow: itemReorderAdvice(item, stock, usage, supplierById.get(item.defaultSupplierId ?? "")).needed,
+      orderNow: itemReorderAdvice(item, stock, usage, supplierById.get(item.defaultSupplierId ?? ""), incoming).needed,
+      incoming: incoming[item.id] ?? 0,
     }));
   // 로트 단위로 지남·임박 (기한이 빠른 순으로 들어온다)
   const expiringLots = lotLevels
@@ -256,12 +259,13 @@ export default async function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <ul className="divide-y">
-                  {runoutItems.slice(0, LIMIT).map(({ item, orderNow }) => (
+                  {runoutItems.slice(0, LIMIT).map(({ item, orderNow, incoming: coming }) => (
                     <li key={item.id}>
                       <Link href={`/items/${item.id}`} className="flex items-center gap-2 py-2 text-sm hover:underline">
                         <span className="min-w-0 truncate font-medium">{item.name}</span>
                         <span className="shrink-0 text-muted-foreground">{runoutLabel(levels[item.id]!.runoutDays!)}</span>
                         {orderNow && <Badge variant="destructive">발주할 때</Badge>}
+                        {coming > 0 && <Badge variant="secondary">입고 예정 {fmt(item.id, coming)}</Badge>}
                         <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
                           {fmt(item.id, levels[item.id]!.quantity)}
                         </span>

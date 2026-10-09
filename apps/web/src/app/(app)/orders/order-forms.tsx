@@ -105,7 +105,7 @@ export function NewOrderForm({ suppliers, suggestionCounts, initialSupplierId }:
           <span className="text-xs text-muted-foreground">
             기본 거래처가 이 거래처인 품목 중 입고까지 버티지 못하는 것을, 최근 {USAGE_WINDOW_DAYS}일 하루 평균 사용량으로
             (입고까지 걸리는 날 + 버틸 날) 동안 쓸 양만큼 담습니다. 사용 기록이 {MIN_USAGE_DAYS}일보다 짧은 품목은 부족 기준의
-            2배까지 채웁니다.
+            2배까지 채웁니다. 이미 발주해서 입고를 기다리는 양은 빼고 계산합니다.
           </span>
         </span>
       </label>

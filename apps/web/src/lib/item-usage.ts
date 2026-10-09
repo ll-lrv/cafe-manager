@@ -1,7 +1,9 @@
 import "server-only";
 import { dailyUsage, dateInTimeZone, USAGE_WINDOW_DAYS, type DailyUsage } from "@cafe/core";
+import { listPurchaseOrders } from "@/lib/api/purchasing";
 import { listItemUsage } from "@/lib/api/stock";
 import { addDays, storeDayRange, storeToday } from "@/lib/inventory";
+import { incomingQuantities } from "@/lib/order-suggestions";
 
 /**
  * 품목별 하루 평균 사용량 (오늘을 뺀 최근 14일, 매장 시간대 기준).
@@ -19,4 +21,9 @@ export async function loadDailyUsage(storeId: string, timeZone: string): Promise
       return usage ? [[r.itemId, usage]] : [];
     }),
   );
+}
+
+/** 품목별 입고 예정 (발주했지만 아직 안 들어온 양, 기본 단위). 발주 추천에서 뺀다 */
+export async function loadIncoming(storeId: string): Promise<Record<string, number>> {
+  return incomingQuantities(await listPurchaseOrders(storeId, { statuses: ["ordered", "partially_received"] }));
 }

@@ -62,6 +62,8 @@ export interface ReorderInput {
   coverDays: number;
   /** 주문 단위 환산값 (1봉 = 1,000g 이면 1000) */
   factor?: number;
+  /** 이미 발주해서 들어올 양 (기본 단위, 발주했지만 아직 입고 안 된 수량). 지금 재고에 더해 판단한다 */
+  incoming?: number;
 }
 
 export interface ReorderAdvice {
@@ -74,7 +76,7 @@ export interface ReorderAdvice {
 }
 
 /**
- * 발주 추천.
+ * 발주 추천. 판단은 "지금 재고(마이너스는 0) + 입고 예정"으로 한다. 이미 발주해 둔 양을 또 추천하지 않기 위해서다.
  * 사용량을 알면: 재고가 (부족 알림 기준 + 입고까지 쓸 양) 이하이면 발주한다. 입고까지 기다리는 동안 부족해지기 때문이다.
  *   수량은 (부족 알림 기준 + 입고까지 + 버틸 날 동안 쓸 양)까지 채우는 양을 주문 단위로 올림.
  *   예) 원두 하루 200g, 기준 1,000g, 입고 2일, 7일 버팀, 현재 1,300g
@@ -82,20 +84,22 @@ export interface ReorderAdvice {
  * 사용량을 모르면: 예전처럼 재고가 부족 알림 기준 이하일 때, 기준 × 2 까지 채우는 양 (suggestOrderQuantity).
  */
 export function reorderAdvice(input: ReorderInput): ReorderAdvice {
-  const { current, minStock, perDay, leadDays, coverDays, factor = 1 } = input;
+  const { current, minStock, perDay, leadDays, coverDays, factor = 1, incoming = 0 } = input;
+  // 입고 예정이 있으면 마이너스 재고는 0으로 보고 더한다 (없으면 예전과 같게 지금 재고 그대로)
+  const position = incoming > 0 ? roundQty(Math.max(current, 0) + incoming) : current;
   if (perDay === null || perDay <= 0) {
     return {
-      needed: stockStatus(current, minStock) !== "ok",
-      quantity: suggestOrderQuantity(current, minStock, factor),
+      needed: stockStatus(position, minStock) !== "ok",
+      quantity: suggestOrderQuantity(position, minStock, factor),
       basis: "min_stock",
     };
   }
   if (factor <= 0) throw new Error("단위 환산값(factor)은 0보다 커야 합니다.");
   const reorderPoint = roundQty(minStock + perDay * leadDays);
   const target = roundQty(minStock + perDay * (leadDays + coverDays));
-  const need = roundQty(target - Math.max(current, 0));
+  const need = roundQty(target - Math.max(position, 0));
   return {
-    needed: current <= 0 || roundQty(current) <= reorderPoint,
+    needed: position <= 0 || roundQty(position) <= reorderPoint,
     quantity: Math.max(1, Math.ceil(roundQty(need / factor))),
     basis: "usage",
   };
