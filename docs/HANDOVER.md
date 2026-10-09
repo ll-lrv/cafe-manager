@@ -1,6 +1,6 @@
 # 인수인계 문서 — cafe-manager
 
-작성일: 2026-10-06 · 최종 갱신: 2026-10-09 · 기준 커밋: `960ef81` (main)
+작성일: 2026-10-06 · 최종 갱신: 2026-10-09 · 기준 커밋: `de94260` (main)
 
 이 문서 하나로 프로젝트를 이어받을 수 있게 정리했다. 세부 기록은 아래 문서에 있다.
 
@@ -21,7 +21,7 @@
 |---|---|
 | 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기(취소·반품 반영) → 메뉴 수익성 순위·목표 원가율(권장 판매가, 목표 넘음 알림) → 메뉴 옵션 차감(판매 입력·CSV 옵션 열) → 소진 예상일·사용량 기반 발주 추천 → 폐기 사유·폐기율 리포트** |
 | 저장소 | https://github.com/ll-lrv/cafe-manager (**공개**) |
-| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 2026-10-08~09 push(`f9ca606`, `baf47a1`, `09f59bc`, `0991a5d`) 모두 통과 (`0991a5d`: 타입·lint·단위 36초 + E2E 15개 8분) |
+| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 2026-10-08~09 push(`f9ca606`, `baf47a1`, `09f59bc`, `0991a5d`, `5921b8e`) 모두 통과 (`5921b8e`: 타입·lint·단위 40초 + E2E 16개 9분) |
 | 테스트 | core 단위 51개, 브라우저 E2E 16개 시나리오 (로컬 전체 통과, 2026-10-09) |
 | 배포 | **아직 없음.** 로컬 Supabase(Docker)에서만 동작. 후보: Supabase 클라우드(서울) + Vercel (§10) |
 | 로컬 DB | 2026-10-07 에 비운 뒤 **데모 계정 하나**를 만들어 둠: `demo-owner@cafe.kr` / `test1234` ("데모 카페", 품목 3·메뉴 2·판매 65잔). 실사 기록은 없다 |
@@ -448,6 +448,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-09 | `ab4743c` | 메뉴 옵션 차감 2단계: CSV 옵션 열 낱말 매칭(옵션/메뉴 이름에 붙임/무시, `option_aliases`), `import_sales` 옵션 차감 |
 | 10-09 | `b22b8f7` | 소진 예상일·사용량 기반 발주 추천: 거래처 입고까지 걸리는 날·버틸 날, `item_usage_summary`, core `usage.ts`, 대시보드 "곧 떨어질 품목"·품목 소진 예상·발주 추천 수량 |
 | 10-09 | `960ef81` | 폐기 사유(필수, `waste_reason`)·폐기 리포트 `/reports/waste`: `waste_summary`, core `waste.ts`, `record_stock_movement`·`stock_outflow` 사유 인자 |
+| 10-09 | `de94260` | 발주 추천에서 이미 발주한(입고 예정) 수량 빼기: core `reorderAdvice` incoming, `incomingQuantities`·`loadIncoming`, 대시보드·품목 상세 "입고 예정" |
 
 ---
 
