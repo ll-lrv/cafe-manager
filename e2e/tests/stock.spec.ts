@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { sql } from "../db";
-import { MOBILE, test } from "../fixtures";
+import { expect, MOBILE, test } from "../fixtures";
 import { check, createItem, hasHorizontalScroll, main, shot } from "../helpers";
 
 const history = (page: Page) => page.locator("main ul").last().innerText();
@@ -77,8 +77,15 @@ test("입출고 기록", async ({ app }) => {
     await p.selectOption("#stock-unit", { label: "팩 (1,000ml)" });
     await p.fill("#stock-quantity", "1");
     check("마이너스 재고 경고", (await main(p)).includes("재고가 마이너스가 됩니다."));
-    await p.fill("#stock-memo", "쏟음");
+    await p.getByRole("button", { name: "폐기 기록" }).click();
+    check("폐기는 사유 필수", await p.locator("#stock-waste-reason").evaluate((e) => (e as HTMLSelectElement).validity.valueMissing));
+    await p.selectOption("#stock-waste-reason", { label: "기타" });
+    await p.getByRole("button", { name: "폐기 기록" }).click();
+    check("기타는 메모 필수", await p.locator("#stock-memo").evaluate((e) => (e as HTMLInputElement).validity.valueMissing));
+    await p.selectOption("#stock-waste-reason", { label: "쏟음·파손" });
+    await p.fill("#stock-memo", "배달 중 쏟음");
     await submit(p, "폐기", "폐기를 기록했습니다.");
+    await expect(p.locator("main ul").last()).toContainText("쏟음·파손");
   });
 
   await test.step("4. 조정 (사장)", async () => {

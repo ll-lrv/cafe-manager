@@ -28,7 +28,7 @@ NestJS로 옮길 때는 이 문서의 표를 보고 기능 단위로 하나씩 �
 
 | | |
 |---|---|
-| 마이그레이션 | `supabase/migrations/20261006031804_record_stock_movement.sql` |
+| 마이그레이션 | `supabase/migrations/20261006031804_record_stock_movement.sql`, 폐기 사유: `20261009000832_waste_reason_functions.sql` |
 | 호출하는 곳 | `apps/web/src/lib/api/stock.ts` `recordMovement()` |
 | NestJS 대응 | `StockService.recordMovement()` (예정) |
 | 권한 | 매장 구성원 (`stock:move`), `adjust` 는 사장·매니저 (`stock:adjust`) |
@@ -37,8 +37,10 @@ NestJS로 옮길 때는 이 문서의 표를 보고 기능 단위로 하나씩 �
 | core 대응 | `toBaseQuantity`, `toBaseUnitCost`, `allocateFifo` |
 | 내부 호출 | `stock_outflow` (나가는 기록) |
 
-입력: `p_item_id`, `p_type`(receive/consume/waste/adjust), `p_quantity`(입력 단위. adjust 만 부호 포함), `p_unit_id`, `p_unit_price`(입력 단위 1개당 원), `p_expires_on`, `p_memo`
+입력: `p_item_id`, `p_type`(receive/consume/waste/adjust), `p_quantity`(입력 단위. adjust 만 부호 포함), `p_unit_id`, `p_unit_price`(입력 단위 1개당 원), `p_expires_on`, `p_memo`, `p_waste_reason`(폐기 사유: expired/spoiled/mistake/damaged/other)
 반환: 기록된 원장 행 수
+
+폐기 사유: `waste` 는 사유가 꼭 있어야 하고(`폐기 사유를 골라 주세요.`), 다른 종류에는 받지 않는다(`폐기 사유는 폐기에만 적습니다.`). `other` 는 메모가 필요하다(`기타 사유를 메모에 적어 주세요.`). 로트를 나눠 꺼내도 모든 원장 행에 사유가 남는다. 원장 CHECK: 사유는 `waste` 행에만. core 대응 `WASTE_REASONS`, `isWasteReason`
 
 처리 순서
 1. 로그인 확인 → 품목 잠금 → 매장 구성원인지, 보관 품목이 아닌지
@@ -224,12 +226,12 @@ A→B, B→C 가 함께 있어도 A 가 C 로 가지 않는다. 같은 재료를
 
 | | |
 |---|---|
-| 마이그레이션 | `supabase/migrations/20261006041140_record_sales.sql` |
-| 호출하는 곳 | `record_stock_movement`, `record_sales`, `complete_stock_count` (클라이언트 실행 권한 없음) |
+| 마이그레이션 | `supabase/migrations/20261006041140_record_sales.sql`, 실사 ID: `20261006043120_stock_count_functions.sql`, 폐기 사유: `20261009000832_waste_reason_functions.sql` |
+| 호출하는 곳 | `record_stock_movement`, `record_sales`, `complete_stock_count`, `import_sales` (클라이언트 실행 권한 없음) |
 | NestJS 대응 | `StockService` 의 private 메서드. `allocateFifo` 결과대로 원장 행을 만든다 |
 | 전제 | 호출하는 쪽이 권한 확인과 품목 잠금을 먼저 한다 |
 
-입력: 품목, 종류, 꺼낼 양(기본 단위, 양수), 입력 단위·factor(원장의 entered 값용), 메모, 기록자, 발생 시각, 판매 ID, 실사 ID
+입력: 품목, 종류, 꺼낼 양(기본 단위, 양수), 입력 단위·factor(원장의 entered 값용), 메모, 기록자, 발생 시각, 판매 ID, 실사 ID, 폐기 사유 (뒤의 셋은 기본값 NULL)
 유통기한 품목이면 로트를 `유통기한 오름차순(없음은 맨 뒤) → 입고 시각 → id` 순으로 꺼내고, 모자라면 로트 없이 1행. 반환: 원장 행 수
 
 ### `create_store` — 매장 만들기
@@ -310,6 +312,19 @@ PostgREST 에서 집계(sum·group by)를 쓸 수 없어 함수로 둔 것이고
 품목별로 판매(`sale`)·사용(`consume`) 원장만 더해 `used`(양수, 반품은 상계)를 낸다. 폐기·조정·입고는 보지 않는다.
 `first_used_at` 은 기간 안의 첫 판매·사용 시각이고, 기간 전에도 판매·사용 기록이 있으면 `p_from` 이다.
 core `dailyUsage` 가 이 날부터 오늘까지의 날 수(최대 14일)로 나누고, 3일(`MIN_USAGE_DAYS`)보다 짧으면 평균을 내지 않는다.
+
+### `waste_summary` — 기간별 폐기 합계 (읽기 전용, 폐기 리포트)
+
+| | |
+|---|---|
+| 마이그레이션 | `supabase/migrations/20261009000832_waste_reason_functions.sql` |
+| 호출하는 곳 | `apps/web/src/lib/api/reports.ts` `getWasteTotals()` → `/reports/waste` |
+| NestJS 대응 | `ReportsService.wasteTotals()` (예정). 같은 집계 SQL 을 그대로 쓰면 된다 |
+| 권한 | `SECURITY INVOKER` (RLS 그대로). 화면은 `report:view`(사장·매니저)만 |
+| core 대응 | `wasteReport` (`waste.ts`, 금액·폐기율·정렬은 모두 여기) |
+
+입력 `p_from` 이상 `p_to` 미만(`occurred_at`). 폐기(`waste`) 원장을 품목·사유별로 더해 양수로 낸다. 사유 기능 전의 폐기는 사유가 NULL("사유 없음").
+폐기율의 분모(판매·사용·폐기로 나간 재료)는 `stock_usage_summary`, 매출은 `menu_sales_summary` 로 함께 읽는다.
 
 ### `menu_sales_summary` — 기간별 메뉴 판매 합계 (읽기 전용, 리포트)
 

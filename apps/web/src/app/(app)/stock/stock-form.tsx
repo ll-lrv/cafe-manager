@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE_UNIT_LABEL, formatQuantity, oneUnitLabel, roundQty } from "@cafe/core";
+import { BASE_UNIT_LABEL, formatQuantity, oneUnitLabel, roundQty, WASTE_REASONS, type WasteReason } from "@cafe/core";
 import { useState } from "react";
 import { Field, FormMessage, NativeSelect, SubmitButton, useFormAction, useToastResult } from "@/components/form-parts";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ const TYPE_OPTIONS: { value: ManualMovementType; label: string }[] = [
 const MEMO_PLACEHOLDER: Record<ManualMovementType, string> = {
   receive: "예) 거래처, 영수증 번호",
   consume: "예) 행사용",
-  waste: "예) 유통기한 지남, 쏟음",
+  waste: "예) 마감 때 남은 우유",
   adjust: "조정 사유 (예: 입고 수량을 잘못 입력함)",
 };
 
@@ -79,6 +79,8 @@ export function StockForm({ items, stock, canAdjust, initialItemId }: {
   const [unitPrice, setUnitPrice] = useState("");
   const [expiresOn, setExpiresOn] = useState("");
   const [memo, setMemo] = useState("");
+  // 폐기 사유는 기록 뒤에도 남겨 둔다 (마감 때 같은 사유로 여러 품목을 버리는 경우가 많다)
+  const [wasteReason, setWasteReason] = useState<WasteReason | "">("");
 
   // 기록에 성공하면 수량 칸들을 비운다. 종류·품목은 그대로 두어 이어서 입력하기 쉽게 한다.
   const [handledState, setHandledState] = useState(state);
@@ -236,7 +238,35 @@ export function StockForm({ items, stock, canAdjust, initialItemId }: {
         </Field>
       )}
 
-      <Field label={type === "adjust" ? "사유" : "메모 (선택)"} htmlFor="stock-memo">
+      {type === "waste" && (
+        <Field
+          label="폐기 사유"
+          htmlFor="stock-waste-reason"
+          hint={WASTE_REASONS.find((r) => r.value === wasteReason)?.hint ?? "리포트에서 사유별 폐기 금액을 볼 수 있습니다."}
+        >
+          <NativeSelect
+            id="stock-waste-reason"
+            name="wasteReason"
+            value={wasteReason}
+            onChange={(e) => setWasteReason(e.target.value as WasteReason | "")}
+            required
+          >
+            <option value="" disabled>
+              사유를 골라 주세요
+            </option>
+            {WASTE_REASONS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+      )}
+
+      <Field
+        label={type === "adjust" ? "사유" : type === "waste" && wasteReason === "other" ? "메모 (기타 사유)" : "메모 (선택)"}
+        htmlFor="stock-memo"
+      >
         <Input
           id="stock-memo"
           name="memo"
@@ -244,7 +274,7 @@ export function StockForm({ items, stock, canAdjust, initialItemId }: {
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
           placeholder={MEMO_PLACEHOLDER[type]}
-          required={type === "adjust"}
+          required={type === "adjust" || (type === "waste" && wasteReason === "other")}
         />
       </Field>
 

@@ -1,5 +1,5 @@
 import "server-only";
-import type { BaseUnit } from "@cafe/core";
+import type { BaseUnit, WasteReason } from "@cafe/core";
 import { createClient } from "@/lib/supabase/server";
 import { ApiError, dbErrorMessage } from "./errors";
 
@@ -19,6 +19,8 @@ export interface MovementInput {
   /** YYYY-MM-DD. 유통기한 품목 입고에 필요 */
   expiresOn: string | null;
   memo: string | null;
+  /** 폐기 사유 (폐기에는 꼭 필요, 다른 종류는 null). 기타(other)는 메모 필수 */
+  wasteReason: WasteReason | null;
 }
 
 export interface Movement {
@@ -35,6 +37,8 @@ export interface Movement {
   unitCost: number | null;
   expiresOn: string | null;
   memo: string | null;
+  /** 폐기 사유. 사유 기능 전에 기록한 폐기는 null */
+  wasteReason: WasteReason | null;
   createdByName: string | null;
   occurredAt: string;
 }
@@ -62,6 +66,7 @@ export async function recordMovement(input: MovementInput): Promise<number> {
     p_unit_price: input.unitPrice ?? undefined,
     p_expires_on: input.expiresOn ?? undefined,
     p_memo: input.memo ?? undefined,
+    p_waste_reason: input.wasteReason ?? undefined,
   });
   // 잘못된 형식의 ID(uuid 아님)
   if (error?.code === "22P02") throw new ApiError("품목을 찾을 수 없습니다.");
@@ -77,6 +82,7 @@ type MovementRow = {
   entered_quantity: number | null;
   unit_cost: number | null;
   memo: string | null;
+  waste_reason: WasteReason | null;
   occurred_at: string;
   item: { name: string; base_unit: BaseUnit } | null;
   unit: { name: string } | null;
@@ -93,7 +99,7 @@ export async function listMovements(
   let query = supabase
     .from("stock_movements")
     .select(
-      "id, item_id, type, quantity, entered_quantity, unit_cost, memo, occurred_at, item:items(name, base_unit), unit:item_units(name), lot:stock_lots(expires_on), creator:profiles(display_name)",
+      "id, item_id, type, quantity, entered_quantity, unit_cost, memo, waste_reason, occurred_at, item:items(name, base_unit), unit:item_units(name), lot:stock_lots(expires_on), creator:profiles(display_name)",
     )
     .eq("store_id", storeId)
     .order("occurred_at", { ascending: false })
@@ -117,6 +123,7 @@ export async function listMovements(
     unitCost: m.unit_cost,
     expiresOn: m.lot?.expires_on ?? null,
     memo: m.memo,
+    wasteReason: m.waste_reason,
     createdByName: m.creator?.display_name ?? null,
     occurredAt: m.occurred_at,
   }));

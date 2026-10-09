@@ -1,5 +1,5 @@
 import "server-only";
-import type { MenuSalesTotal, UsageTotals } from "@cafe/core";
+import type { MenuSalesTotal, UsageTotals, WasteTotal } from "@cafe/core";
 import { createClient } from "@/lib/supabase/server";
 import { ApiError, dbErrorMessage } from "./errors";
 
@@ -44,4 +44,16 @@ export async function getMenuSales(storeId: string, range: { from: string; to: s
     quantity: Number(r.quantity),
     amount: Number(r.amount),
   }));
+}
+
+/** 기간(from 이상 to 미만, ISO) 동안 품목·사유별 폐기량 (양수). 폐기 리포트용 */
+export async function getWasteTotals(storeId: string, range: { from: string; to: string }): Promise<WasteTotal[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("waste_summary", {
+    p_store_id: storeId,
+    p_from: range.from,
+    p_to: range.to,
+  });
+  if (error) throw new ApiError(dbErrorMessage(error));
+  return data.map((r) => ({ itemId: r.item_id, reason: r.reason, quantity: Number(r.quantity) }));
 }

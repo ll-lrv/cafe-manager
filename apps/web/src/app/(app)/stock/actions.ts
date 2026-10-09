@@ -1,6 +1,6 @@
 "use server";
 
-import { can } from "@cafe/core";
+import { can, isWasteReason } from "@cafe/core";
 import { revalidatePath } from "next/cache";
 import { ApiError, toActionError, type ActionState } from "@/lib/api/errors";
 import { getLatestCosts } from "@/lib/api/menus";
@@ -45,6 +45,10 @@ export async function recordMovementAction(_prev: ActionState, formData: FormDat
     if (!Number.isFinite(quantity) || quantity <= 0) throw new ApiError("수량은 0보다 큰 숫자로 입력해 주세요.");
     const memo = text(formData, "memo") || null;
     if (type === "adjust" && !memo) throw new ApiError("조정 사유를 입력해 주세요.");
+    const reason = text(formData, "wasteReason");
+    const wasteReason = type === "waste" && isWasteReason(reason) ? reason : null;
+    if (type === "waste" && !wasteReason) throw new ApiError("폐기 사유를 골라 주세요.");
+    if (wasteReason === "other" && !memo) throw new ApiError("기타 사유를 메모에 적어 주세요.");
 
     const unitPrice = type === "receive" ? numberOrNull(formData, "unitPrice") : null;
     // 단가를 넣은 입고면 단가 변동 알림을 위해 입고 전 단가를 받아 둔다. (원가는 리포트 권한이 있는 사람에게만)
@@ -60,6 +64,7 @@ export async function recordMovementAction(_prev: ActionState, formData: FormDat
       unitPrice,
       expiresOn: type === "receive" || type === "adjust" ? text(formData, "expiresOn") || null : null,
       memo,
+      wasteReason,
     });
 
     revalidatePath("/stock");

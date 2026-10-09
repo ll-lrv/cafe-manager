@@ -8,6 +8,7 @@ import type { ResolvedPeriods } from "./periods";
 const TABS = [
   { href: "/reports", label: "이론 vs 실제" },
   { href: "/reports/menus", label: "메뉴 수익성" },
+  { href: "/reports/waste", label: "폐기" },
 ] as const;
 
 /** 리포트 종류 탭 */

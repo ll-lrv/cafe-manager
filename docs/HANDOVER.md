@@ -1,6 +1,6 @@
 # 인수인계 문서 — cafe-manager
 
-작성일: 2026-10-06 · 최종 갱신: 2026-10-09 · 기준 커밋: `b22b8f7` (main)
+작성일: 2026-10-06 · 최종 갱신: 2026-10-09 · 기준 커밋: (이번 커밋) (main)
 
 이 문서 하나로 프로젝트를 이어받을 수 있게 정리했다. 세부 기록은 아래 문서에 있다.
 
@@ -15,17 +15,17 @@
 
 ## 1. 한눈에 보기
 
-카페 운영 관리 앱. **재고관리 MVP는 끝났고, 유료화를 위한 기능(카페 기본 템플릿, 이론 vs 실제 리포트, 단가 알림, CSV 판매 가져오기, 메뉴 수익성·목표 원가율, 메뉴 옵션 차감, 소진 예상일·사용량 기반 발주 추천)을 붙이는 중이다.** 배포는 아직 안 했다.
+카페 운영 관리 앱. **재고관리 MVP는 끝났고, 유료화를 위한 기능(카페 기본 템플릿, 이론 vs 실제 리포트, 단가 알림, CSV 판매 가져오기, 메뉴 수익성·목표 원가율, 메뉴 옵션 차감, 소진 예상일·사용량 기반 발주 추천, 폐기 사유·폐기율)을 붙이는 중이다.** 배포는 아직 안 했다.
 
 | 항목 | 상태 |
 |---|---|
-| 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기(취소·반품 반영) → 메뉴 수익성 순위·목표 원가율(권장 판매가, 목표 넘음 알림) → 메뉴 옵션 차감(판매 입력·CSV 옵션 열) → 소진 예상일·사용량 기반 발주 추천** |
+| 기능 | 로그인·매장·직원 초대 → 품목 → 입출고 → 재고 현황(실시간) → 메뉴·레시피 → 판매(재료 자동 차감) → 재고 실사 → 거래처·발주 → 매장 설정(이름·시간대) → **카페 기본 템플릿 → 이론 vs 실제 리포트(AvT) → 입고 단가 변동 알림 → CSV 판매 가져오기(취소·반품 반영) → 메뉴 수익성 순위·목표 원가율(권장 판매가, 목표 넘음 알림) → 메뉴 옵션 차감(판매 입력·CSV 옵션 열) → 소진 예상일·사용량 기반 발주 추천 → 폐기 사유·폐기율 리포트** |
 | 저장소 | https://github.com/ll-lrv/cafe-manager (**공개**) |
-| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 2026-10-08~09 push(`f9ca606`, `baf47a1`, `09f59bc`) 모두 통과 (타입·lint·단위 + E2E 14개) |
-| 테스트 | core 단위 48개, 브라우저 E2E 15개 시나리오 (로컬 전체 통과, 2026-10-09) |
+| CI | GitHub Actions — push·PR 마다 타입·lint·단위 테스트 + 브라우저 E2E. 2026-10-08~09 push(`f9ca606`, `baf47a1`, `09f59bc`, `0991a5d`) 모두 통과 (`0991a5d`: 타입·lint·단위 36초 + E2E 15개 8분) |
+| 테스트 | core 단위 50개, 브라우저 E2E 16개 시나리오 (로컬 전체 통과, 2026-10-09) |
 | 배포 | **아직 없음.** 로컬 Supabase(Docker)에서만 동작. 후보: Supabase 클라우드(서울) + Vercel (§10) |
 | 로컬 DB | 2026-10-07 에 비운 뒤 **데모 계정 하나**를 만들어 둠: `demo-owner@cafe.kr` / `test1234` ("데모 카페", 품목 3·메뉴 2·판매 65잔). 실사 기록은 없다 |
-| 다음 | **폐기 사유·폐기율** (§10-4). 배포·시범 매장은 이보다 먼저 하기를 권장 (사용자 결정, §10) |
+| 다음 | **배포 + 시범 매장** (§10-5, 사용자 결정 필요). 그 전에 할 수 있는 것: 발주 추천에서 입고 예정 수량 빼기 (§10-0) |
 
 ---
 
@@ -63,7 +63,7 @@ npx supabase start -x imgproxy,edge-runtime,logflare,vector,supavisor
 npx supabase status        # Publishable key 를 .env.local 의 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 에
 pnpm dev                   # http://localhost:3000
 ```
-- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 34개가 모두 적용된다.
+- 로컬 DB가 비어 있으면 `npx supabase start` 때 마이그레이션 36개가 모두 적용된다.
 - DB 보기: Supabase Studio http://127.0.0.1:55323 · 메일함(Mailpit) http://127.0.0.1:55324
 
 ### 이어서 작업할 때
@@ -115,8 +115,8 @@ apps/web                Next.js 16 (App Router)
   src/proxy.ts          (Next 16 의 middleware) 로그인 여부만 확인
 packages/core           순수 TS 비즈니스 로직 + 단위 테스트 (DB·프레임워크 의존 금지)
 packages/db             Drizzle 스키마 (스키마 변경은 반드시 여기서)
-supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (34개)
-e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 15개
+supabase/migrations     drizzle-kit 생성 SQL + 함수·RLS·트리거 SQL (36개)
+e2e/                    브라우저 E2E (@playwright/test + 설치된 Chrome), tests/*.spec.ts 16개
 .github/workflows/ci.yml  CI (타입·lint·단위 테스트, Supabase + E2E)
 docs/                   이 문서, PROGRESS, db-functions
 ```
@@ -133,7 +133,7 @@ docs/                   이 문서, PROGRESS, db-functions
 ```
 
 ### packages/core 주요 함수
-단위 환산(`toBaseQuantity`, `formatQuantity`, `formatUnitCount`, `oneUnitLabel`), 레시피 차감(`saleDeductions`), 원가(`recipeCost`, `costRate`), FIFO(`allocateFifo`), 실사 조정(`countAdjustments`), 발주(`derivePurchaseOrderStatus`, `suggestOrderQuantity`, `orderTotal`), 재고·유통기한 상태(`stockStatus`, `expiryStatus`), 시간대(`dateInTimeZone`, `zonedTimeToUtc`, `isValidTimeZone`), 권한(`can`), 기본 템플릿 데이터(`CAFE_TEMPLATE`), 이론 vs 실제(`avtLine`, `avtSummary`, `sortAvtLines`), 단가 변동(`costChangePercent`, `isNotableCostChange`, `menuCostImpacts`, 기준 `COST_ALERT_PERCENT`·`COST_ALERT_DAYS`), 판매 파일 읽기(`decodeCsv`, `parseCsv`, `findHeaderRow`, `guessColumns`, `parseSaleDateTime`, `readSaleRows`, `matchMenus`), 메뉴 수익성(`suggestedPrice`, `effectiveTargetRate`, `isOverTarget`, `menuProfitLines`), 메뉴 옵션(`applyOptions`, `optionLineName`), CSV 옵션 열(`splitOptionNames`, `matchOptionWords`, `resolveOptionWords`, `summarizeOptionWords`), 사용량·발주 추천(`dailyUsage`, `daysUntilEmpty`, `runoutLabel`, `reorderAdvice`, 기준 `USAGE_WINDOW_DAYS`·`MIN_USAGE_DAYS`·`RUNOUT_SOON_DAYS`·`DEFAULT_LEAD_DAYS`·`DEFAULT_COVER_DAYS`). 테스트 48개.
+단위 환산(`toBaseQuantity`, `formatQuantity`, `formatUnitCount`, `oneUnitLabel`), 레시피 차감(`saleDeductions`), 원가(`recipeCost`, `costRate`), FIFO(`allocateFifo`), 실사 조정(`countAdjustments`), 발주(`derivePurchaseOrderStatus`, `suggestOrderQuantity`, `orderTotal`), 재고·유통기한 상태(`stockStatus`, `expiryStatus`), 시간대(`dateInTimeZone`, `zonedTimeToUtc`, `isValidTimeZone`), 권한(`can`), 기본 템플릿 데이터(`CAFE_TEMPLATE`), 이론 vs 실제(`avtLine`, `avtSummary`, `sortAvtLines`), 단가 변동(`costChangePercent`, `isNotableCostChange`, `menuCostImpacts`, 기준 `COST_ALERT_PERCENT`·`COST_ALERT_DAYS`), 판매 파일 읽기(`decodeCsv`, `parseCsv`, `findHeaderRow`, `guessColumns`, `parseSaleDateTime`, `readSaleRows`, `matchMenus`), 메뉴 수익성(`suggestedPrice`, `effectiveTargetRate`, `isOverTarget`, `menuProfitLines`), 메뉴 옵션(`applyOptions`, `optionLineName`), CSV 옵션 열(`splitOptionNames`, `matchOptionWords`, `resolveOptionWords`, `summarizeOptionWords`), 사용량·발주 추천(`dailyUsage`, `daysUntilEmpty`, `runoutLabel`, `reorderAdvice`, 기준 `USAGE_WINDOW_DAYS`·`MIN_USAGE_DAYS`·`RUNOUT_SOON_DAYS`·`DEFAULT_LEAD_DAYS`·`DEFAULT_COVER_DAYS`), 폐기(`WASTE_REASONS`, `isWasteReason`, `wasteReasonLabel`, `wasteReport`). 테스트 50개.
 DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기면 core 함수를 쓰고 SQL은 지운다.
 
 ---
@@ -146,7 +146,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `/dashboard` | 오늘 매출, 부족 품목, 유통기한 확인, 곧 떨어질 품목(최근 사용량으로 7일 안, "발주할 때" 표시), 진행 중 실사, 입고 단가 변동, 목표 원가율을 넘은 메뉴, 입고 예정, 최근 기록. 품목이 없으면 "기본 템플릿 불러오기" | 구성원 (단가 변동·목표 넘은 메뉴·입고 예정·템플릿은 사장·매니저) |
 | `/sales` | 메뉴별 판매 일괄 입력(± 버튼, 메뉴마다 옵션 묶음 줄 추가), 차감될 재료 미리보기, 날짜 이동(지난 날은 23:59로 기록), 매출 합계, 판매 취소 (가져온 판매는 "CSV" 표시) | 입력: 구성원 / 취소: 사장·매니저 |
 | `/sales/import` | CSV 판매 가져오기: 파일(UTF-8·EUC-KR) → 열 맞추기(자동 추측) → 옵션 맞추기(옵션 열 낱말: 옵션/메뉴 이름에 붙임/무시, 저장) → 메뉴 맞추기(저장해 두고 다음에 자동) → 가져오기(500건씩), 가져오기 기록·취소 | 사장·매니저 |
-| `/stock` | 입고·사용·폐기·조정, 재고 미리보기, 단가·유통기한, 최근 기록 | 구성원 / 조정: 사장·매니저 |
+| `/stock` | 입고·사용·폐기(사유 필수)·조정, 재고 미리보기, 단가·유통기한, 최근 기록 | 구성원 / 조정: 사장·매니저 |
 | `/items`, `/items/[id]`, `/items/new`, `/items/categories` | 품목·재고 목록(상태 필터, 소진 예상·"7일 안에 소진" 필터), 상세(하루 평균 사용량·소진 예상·발주할 때, 로트별 남은 양, 기록, 입고 단가와 최근 변동), 입고 단위, 기본 거래처, 카테고리 | 보기: 구성원 (입고 단가는 사장·매니저) / 관리: 사장·매니저 |
 | `/menus/options`, `/menus/options/[id]`, `/menus/options/new` | 메뉴 옵션(샷 추가·오트밀크 변경·사이즈업): 추가 금액, 재료 규칙(추가·바꾸기·늘리기), 메뉴별 원가 변화, 보관 | 보기: 구성원 / 관리: 사장·매니저 |
 | `/menus`, `/menus/[id]`, `/menus/new` | 메뉴 가격, 레시피, 원가·원가율, 목표 원가율(비우면 매장 기본)과 목표 맞추는 판매가, 목록 "목표 초과" 배지 | 보기: 구성원 / 관리: 사장·매니저 |
@@ -155,6 +155,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `/suppliers`, `/suppliers/[id]`, `/suppliers/new` | 거래처 (입고까지 걸리는 날·한 번 발주로 버틸 날) | 사장·매니저 |
 | `/reports` | 이론 vs 실제 사용량(AvT): 매출·이론/실제 원가와 원가율·차이 금액, 품목별 차이(원인별), 기간(실사 구간·7일·30일·이번 달·직접) | 사장·매니저 |
 | `/reports/menus` | 메뉴 수익성(탭): 매출·재료비·마진, 메뉴별 마진 순위와 분류(효자/많이 팔리지만 덜 남음/잘 남지만 덜 팔림/정리 후보), 목표 원가율을 넘은 메뉴와 목표 맞추는 판매가. 기간(7일·30일(기본)·이번 달·직접) | 사장·매니저 |
+| `/reports/waste` | 폐기(탭): 폐기 금액, 폐기율(나간 재료 중), 매출 대비, 사유별 금액·비율, 품목별 폐기량·금액·사유. 기간(7일·30일(기본)·이번 달·직접) | 사장·매니저 |
 | `/settings/members` | 직원 초대(링크), 역할 변경, 내보내기 | 사장 |
 | `/settings/store` | 매장 이름, 시간대, 목표 원가율(기본 30%) | 사장 |
 
@@ -169,6 +170,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 - **삭제 대신 보관**: 품목·메뉴·거래처·옵션은 보관(archived_at)만 한다.
 - **수량 표시**: 단위 이름이 숫자로 시작하면("1L 팩") 수량과 나눠 "2 × 1L 팩"으로 보여준다. 숫자와 단위 이름을 붙여 쓸 땐 `formatQuantity`·`formatUnitCount`·`oneUnitLabel` 을 쓴다 (수량과 단위 이름을 문자열로 직접 붙이지 않는다).
 - **기본 템플릿**: 내용은 `packages/core/src/templates.ts` 한 곳. 같은 이름이 있으면 건너뛰므로 두 번 불러도 안전. 새로 만든 메뉴에만 레시피를 넣는다. 매장 만들 때 템플릿 적용이 실패해도 매장은 만들어지고(서버 로그만 남김) 대시보드에서 다시 불러올 수 있다.
+- **폐기 사유·폐기율**: 폐기는 사유를 꼭 고른다 — 유통기한 지남·상함·품질 이상·제조 실수·쏟음·파손·기타(메모 필수). `stock_movements.waste_reason`(enum, 폐기 행에만), 로트를 나눠 꺼내도 행마다 남는다. 사유 기능 전 폐기는 "사유 없음". 사유는 마감 때 연달아 버리는 경우를 위해 기록 뒤에도 남겨 둔다. **폐기 리포트**(`/reports/waste`): 금액은 최근 입고 단가 기준(AvT 와 같음), 폐기율 = 폐기 금액 ÷ 판매·사용·폐기로 나간 재료 금액, 매출 대비 = 폐기 금액 ÷ 매출. 단가 없는 품목은 금액에서 빠지고 안내한다. 계산은 core `waste.ts`, 합계는 DB `waste_summary`.
 - **이론 vs 실제(AvT)**: 이론 = 판매로 차감된 양. 실제 = 이론 + 레시피 밖 사용(consume) + 폐기 + 실사에서 모자란 양 + 직접 조정. 금액은 최근 입고 단가 기준. 실사 구간은 (앞 실사 완료, 이번 실사 완료] 로 자른다(실사 조정 원장이 완료 시각에 기록되므로). 그 기간에 세지 않은 품목은 "실사 안 함" — 차이 0 이 "맞았다"는 뜻이 아니다.
 - **CSV 판매 가져오기**: 한 줄 = 메뉴 하나의 판매(날짜[·시각], 메뉴 이름[+옵션], 수량, [금액], [주문번호]). 파일은 브라우저에서 읽고(core `sales-import.ts`), 서버 액션이 매장 시간대로 판매 시각을 만든다(시각이 없으면 그 날 23:59:59, 오늘이면 지금). 행 키 = 파일 내용(날짜·시각·주문번호·이름·수량·금액 + 같은 내용 몇 번째)이라 같은 파일·겹치는 기간을 다시 올려도 중복되지 않는다. **취소·반품**: 수량이나 금액이 음수인 줄은 음수 판매로 기록해 매출을 빼고 재료를 되돌린다(로트 없이, 판매 목록에 "취소" 표시). 상태 열(결제상태 등)이 "취소/환불/반품"인 주문 줄은 판매 + 취소 두 줄로 들어가 0이 되고, 예전에 "완료"로 가져온 같은 주문도 상계된다. 합계 줄, 수량 0, 미래 날짜는 가져오지 않는다. 가져오기를 취소하면 그때 들어온 판매·재료 차감이 cascade 로 지워진다(같은 파일을 다시 올릴 수 있음). 가져온 판매를 판매 화면에서 **하나만 취소**하면 다른 기기에 실시간 반영되고, 그 행 키가 `cancelled_sale_keys` 에 남아 겹치는 파일을 다시 올려도 되살아나지 않는다. 토스 포스는 매출 엑셀(비밀번호 걸린 xlsx)의 "상품 주문" 시트를 CSV 로 저장해서 올린다 (열 이름은 2026-10-08 토스플레이스 안내 글 기준, 실제 파일로는 아직 확인 못 함).
 - **입고 단가 변동 알림**: 품목의 "가장 최근 단가 변동" = 직전 입고와 단가가 달라진 마지막 입고(`item_cost_changes` 뷰). 직전보다 5% 이상(`COST_ALERT_PERCENT`) 바뀌면 ① 입고 직후 알림(입출고·발주 입고, 알림 아래 안내로 12초) ② 대시보드 카드(최근 14일, `COST_ALERT_DAYS`) ③ 품목 상세(기준 미만도 표시)에 그 품목을 쓰는 메뉴의 원가율 변화를 보여준다. 다른 재료는 지금 단가로 계산한다. 원가 정보라 `report:view`(사장·매니저)에게만 보인다. 입고 직후 알림은 입고 전·후 `item_latest_costs` 를 비교한다 (`lib/cost-notice.ts`).
@@ -203,7 +205,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 ## 7. DB
 
-### 마이그레이션 (적용 순서, 34개 — CI 가 매번 빈 DB에 처음부터 적용)
+### 마이그레이션 (적용 순서, 36개 — CI 가 매번 빈 DB에 처음부터 적용)
 | 파일 | 내용 |
 |---|---|
 | `20261003015300_init` | 전체 스키마 (Drizzle) |
@@ -229,11 +231,12 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `20261008142544_menu_options`, `142641_menu_option_functions`, `143350_menu_option_rules_check` | 메뉴 옵션·재료 규칙·판매에 붙은 옵션 표와 RLS, `sale_ingredients`, `record_sales` 옵션, `menu_sales_summary` 옵션 묶음별, 옵션 규칙에 쓰인 품목의 기본 단위 잠금, 규칙 모양 CHECK 수정(수량 NULL 통과 막음) |
 | `20261008144949_option_aliases`, `144950_import_sales_options` | CSV 옵션 열 낱말 매칭 표 `option_aliases`(RLS), `import_sales` 옵션 기록·차감 |
 | `20261008232857_supplier_lead_days`, `232859_item_usage` | 거래처 입고까지 걸리는 날(0~60)·버틸 날(1~90), 기간별 품목 판매·사용량 `item_usage_summary` |
+| `20261009000829_waste_reason`, `000832_waste_reason_functions` | 폐기 사유 enum·원장 칸(폐기 행에만 CHECK), `stock_outflow`·`record_stock_movement` 에 사유 인자(폐기는 필수, 기타는 메모 필수), 기간별 폐기 합계 `waste_summary` |
 
 ### DB 함수·트리거 (상세는 `docs/db-functions.md`)
 | 이름 | 하는 일 |
 |---|---|
-| `record_stock_movement` | 입고·사용·폐기·조정 (단위·단가 환산, 로트, 유통기한 순 차감) |
+| `record_stock_movement` | 입고·사용·폐기·조정 (단위·단가 환산, 로트, 유통기한 순 차감, 폐기 사유) |
 | `record_sales` | 여러 메뉴(+옵션 묶음) 판매 + 레시피·옵션대로 재료 차감 |
 | `sale_ingredients` (내부 전용) | 메뉴 1개 + 옵션 묶음의 재료 (core `applyOptions` 와 같은 계산) |
 | `start_stock_count` / `complete_stock_count` | 실사 시작(줄 스냅샷) / 센 시각 기준 조정 |
@@ -243,6 +246,7 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 | `apply_store_template` | 카테고리·품목·입고 단위·메뉴·레시피를 한 트랜잭션으로 (같은 이름은 건너뜀, 사장·매니저) |
 | `import_sales` | CSV 판매 묶음(최대 500건) 기록 + 옵션을 반영한 재료 차감. 같은 행 키(`external_id`)는 건너뜀, 사장·매니저 |
 | `stock_usage_summary` (읽기 전용, SECURITY INVOKER) | 기간별 품목 원장 합계 + 그 기간에 센 품목인지. 집계만 하고 계산은 core `avt.ts` |
+| `waste_summary` (읽기 전용, SECURITY INVOKER) | 기간별 품목·사유별 폐기량. 금액·폐기율은 core `waste.ts` |
 | `item_usage_summary` (읽기 전용, SECURITY INVOKER) | 기간별 품목 판매·사용량 + 처음 쓴 시각. 하루 평균·소진 예상·추천 수량 계산은 core `usage.ts` |
 | `menu_sales_summary` (읽기 전용, SECURITY INVOKER) | 기간별 메뉴·옵션 묶음 판매량·금액 합계 (반품 상계). 계산은 core `menu-profit.ts` |
 | 트리거 `prevent_item_base_unit_change` | 입출고·레시피·옵션 규칙에 쓰인 품목의 기본 단위 변경 차단 |
@@ -316,10 +320,10 @@ DB 함수 안에 같은 규칙이 SQL로 복제되어 있다. NestJS로 옮기�
 
 | 종류 | 상태 |
 |---|---|
-| core 단위 테스트 (vitest) | 48개, `pnpm test` |
+| core 단위 테스트 (vitest) | 50개, `pnpm test` |
 | 타입·lint | `pnpm typecheck`(web·core·db·e2e), `pnpm lint`(web: Next 규칙, core·db: `typescript-eslint` 권장) 통과 |
 | DB 함수·정책 | 단계마다 SQL로 실제 사용자 권한(`set role authenticated` + JWT claims)으로 검증 후 롤백 |
-| 브라우저 E2E | `e2e/tests/` 15개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동, 메뉴 수익성·목표 원가율, 메뉴 옵션(판매 입력·CSV 옵션 열), 소진 예상·발주 추천. 로컬 약 7분(3개 병렬), CI 약 6분 |
+| 브라우저 E2E | `e2e/tests/` 16개 시나리오 — 가입·초대, 품목, 입출고, 재고 현황, 판매, CSV 판매 가져오기, 실사, 발주, 매장 설정, 기본 템플릿, 이론 vs 실제 리포트, 입고 단가 변동, 메뉴 수익성·목표 원가율, 메뉴 옵션(판매 입력·CSV 옵션 열), 소진 예상·발주 추천, 폐기 사유·폐기율. 로컬 약 7분(3개 병렬), CI 약 8분 |
 | CI | GitHub Actions 두 잡(`타입·lint·단위 테스트`, `브라우저 E2E`). 실패하면 실행 화면 Artifacts 의 `playwright-report` 를 받아 본다 |
 
 E2E 는 `@playwright/test` 다. 시나리오 하나가 테스트 하나이고 단계(`test.step`)로 나뉘며, 확인 항목은 `expect.soft` 라 하나가 실패해도 끝까지 돈다. 실패하면 한 번 재시도한다(재시도에서 통과하면 `flaky`).
@@ -371,13 +375,14 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 - [x] 메뉴별 판매량 × 개당 마진으로 "많이 벌어주는 메뉴 / 많이 팔리지만 남는 게 적은 메뉴". `/reports/menus` 탭 (`report:view`)
 - [ ] 남은 것(필요하면): 기간 비교(지난달 대비 마진 변화), 카테고리별 합계, CSV 내보내기. 판매가 몇 주 쌓인 시범 매장 반응을 보고 정한다
 
-### 4) 폐기 사유·폐기율
-- [ ] 폐기 메모를 사유 선택지(유통기한·제조 실수·파손 등)로 바꾸고, 리포트에 폐기율
+### 4) 폐기 사유·폐기율 — 완료 (2026-10-09)
+- [x] 폐기 사유 선택(필수), 폐기 리포트 `/reports/waste` (폐기율·사유별·품목별). 동작은 §5
+- [ ] 남은 것(필요하면): 대시보드에 이번 주 폐기 금액, 기간 비교(지난달 대비), 유통기한 지난 로트를 한 번에 폐기, 직원별 폐기
 
 ### 5) 배포 — 시범 매장 전에 필요 (사용자 결정 필요)
 후보: **Supabase 클라우드(서울 리전) + Vercel**. Supabase·Vercel 계정 로그인은 사용자가 직접 해야 한다.
 - [ ] 정할 것: 환경 개수(운영만 / 운영+스테이징), 요금 등급, 주소(기본 `*.vercel.app` / 도메인)
-- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 34개)
+- [ ] Supabase 프로젝트 생성(서울) → `supabase link` → `supabase db push` (마이그레이션 36개)
 - [ ] 인증 설정: 가입 확인 메일 켜기(코드는 대비됨: 세션 없이 오면 확인 메일 안내), 사이트 주소·리디렉트 주소, 운영 SMTP
 - [ ] Vercel 프로젝트: GitHub 연결, 루트 `apps/web`, 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`), 함수 리전 서울
 - [ ] 배포 주소에서 가입~판매 직접 확인. 운영 DB에 E2E 를 돌리지 않는다 (테스트 계정이 생김) — 필요하면 스테이징에서
@@ -441,6 +446,7 @@ E2E 중 `caret-color: transparent` hydration 경고는 Playwright 스크린샷�
 | 10-08 | `db39ee4` | 메뉴 옵션 차감 1단계: 옵션·재료 규칙(추가·바꾸기·늘리기), 판매 입력 옵션 묶음 줄, `sale_ingredients`, 메뉴 수익성 재료비 반영 |
 | 10-09 | `ab4743c` | 메뉴 옵션 차감 2단계: CSV 옵션 열 낱말 매칭(옵션/메뉴 이름에 붙임/무시, `option_aliases`), `import_sales` 옵션 차감 |
 | 10-09 | `b22b8f7` | 소진 예상일·사용량 기반 발주 추천: 거래처 입고까지 걸리는 날·버틸 날, `item_usage_summary`, core `usage.ts`, 대시보드 "곧 떨어질 품목"·품목 소진 예상·발주 추천 수량 |
+| 10-09 | (이번 커밋) | 폐기 사유(필수, `waste_reason`)·폐기 리포트 `/reports/waste`: `waste_summary`, core `waste.ts`, `record_stock_movement`·`stock_outflow` 사유 인자 |
 
 ---
 

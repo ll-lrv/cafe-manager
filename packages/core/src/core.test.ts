@@ -52,6 +52,9 @@ import {
   daysUntilEmpty,
   reorderAdvice,
   runoutLabel,
+  wasteReport,
+  wasteReasonLabel,
+  isWasteReason,
   toBaseQuantity,
   toBaseUnitCost,
 } from "./index";
@@ -647,5 +650,53 @@ describe("usage", () => {
     const advice = reorderAdvice({ current: 500, minStock: 2000, perDay: null, leadDays: 1, coverDays: 7, factor: 1000 });
     expect(advice).toEqual({ needed: true, quantity: 4, basis: "min_stock" });
     expect(reorderAdvice({ current: 2500, minStock: 2000, perDay: null, leadDays: 1, coverDays: 7 }).needed).toBe(false);
+  });
+});
+
+describe("waste", () => {
+  const usage = (itemId: string, sold: number, consumed: number, wasted: number) => ({
+    itemId, received: 0, sold, consumed, wasted, countAdjusted: 0, manualAdjusted: 0, counted: false,
+  });
+
+  it("폐기율 = 폐기 금액 ÷ 나간 재료 금액, 매출 대비", () => {
+    const r = wasteReport({
+      wastes: [
+        { itemId: "milk", reason: "expired", quantity: 1000 },
+        { itemId: "milk", reason: "mistake", quantity: 200 },
+        { itemId: "bean", reason: "damaged", quantity: 100 },
+        { itemId: "cup", reason: null, quantity: 5 },
+      ],
+      // 우유: 판매 3,000 + 폐기 1,200 / 원두: 판매 900 + 사용 100 + 폐기 100
+      usage: [usage("milk", -3000, 0, -1200), usage("bean", -900, -100, -100), usage("cup", -50, 0, -5)],
+      unitCosts: { milk: 3, bean: 25 },
+      salesAmount: 100_000,
+    });
+    // 폐기: 우유 1,200 × 3 = 3,600 + 원두 100 × 25 = 2,500 → 6,100 (컵은 단가 없음)
+    expect(r.wasteCost).toBe(6100);
+    // 나간 재료: 우유 4,200 × 3 = 12,600 + 원두 1,100 × 25 = 27,500 → 40,100
+    expect(r.outflowCost).toBe(40100);
+    expect(r.wasteRate).toBeCloseTo(6100 / 40100);
+    expect(r.salesRate).toBeCloseTo(0.061);
+    expect(r.byReason.map((x) => [x.reason, x.cost])).toEqual([
+      ["expired", 3000],
+      ["damaged", 2500],
+      ["mistake", 600],
+    ]);
+    expect(r.byItem.map((l) => [l.itemId, l.cost])).toEqual([
+      ["milk", 3600],
+      ["bean", 2500],
+      ["cup", null],
+    ]);
+    expect(r.byItem[0]!.reasons.map((x) => x.reason)).toEqual(["expired", "mistake"]);
+    expect(r.missingCostItemIds).toEqual(["cup"]);
+  });
+
+  it("폐기·매출이 없으면 비율 없음, 사유 이름", () => {
+    const r = wasteReport({ wastes: [], usage: [], unitCosts: {}, salesAmount: 0 });
+    expect(r).toMatchObject({ wasteCost: 0, wasteRate: null, salesRate: null, byReason: [], byItem: [] });
+    expect(wasteReasonLabel("mistake")).toBe("제조 실수");
+    expect(wasteReasonLabel(null)).toBe("사유 없음");
+    expect(isWasteReason("expired")).toBe(true);
+    expect(isWasteReason("lost")).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { formatQuantity, roundQty } from "@cafe/core";
+import { formatQuantity, roundQty, wasteReasonLabel } from "@cafe/core";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import type { Movement, MovementType } from "@/lib/api/stock";
@@ -61,6 +61,7 @@ export function MovementList({
       {movements.map((m) => {
         const badge = TYPE_BADGE[m.type];
         const details = [
+          m.type === "waste" && wasteReasonLabel(m.wasteReason),
           date.format(new Date(m.occurredAt)),
           m.createdByName,
           m.expiresOn && `유통기한 ${m.expiresOn}`,

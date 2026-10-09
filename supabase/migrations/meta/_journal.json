@@ -239,6 +239,20 @@
       "when": 1791502139603,
       "tag": "20261008232859_item_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791504509779,
+      "tag": "20261009000829_waste_reason",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791504512043,
+      "tag": "20261009000832_waste_reason_functions",
+      "breakpoints": true
     }
   ]
 }

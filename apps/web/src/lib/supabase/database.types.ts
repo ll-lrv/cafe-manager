@@ -579,14 +579,14 @@ isOneToOne: false
                   ]
                 },"stock_movements": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"entered_quantity": number | null,"entered_unit_id": string | null,"id": string,"item_id": string,"lot_id": string | null,"memo": string | null,"occurred_at": string,"purchase_order_line_id": string | null,"quantity": number,"sale_record_id": string | null,"stock_count_id": string | null,"store_id": string,"type": Database["public"]['Enums']["movement_type"],"unit_cost": number | null
+                    "created_at": string,"created_by": string | null,"entered_quantity": number | null,"entered_unit_id": string | null,"id": string,"item_id": string,"lot_id": string | null,"memo": string | null,"occurred_at": string,"purchase_order_line_id": string | null,"quantity": number,"sale_record_id": string | null,"stock_count_id": string | null,"store_id": string,"type": Database["public"]['Enums']["movement_type"],"unit_cost": number | null,"waste_reason": Database["public"]['Enums']["waste_reason"] | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"entered_quantity"?: number | null,"entered_unit_id"?: string | null,"id"?: string,"item_id": string,"lot_id"?: string | null,"memo"?: string | null,"occurred_at"?: string,"purchase_order_line_id"?: string | null,"quantity": number,"sale_record_id"?: string | null,"stock_count_id"?: string | null,"store_id": string,"type": Database["public"]['Enums']["movement_type"],"unit_cost"?: number | null
+                    "created_at"?: string,"created_by"?: string | null,"entered_quantity"?: number | null,"entered_unit_id"?: string | null,"id"?: string,"item_id": string,"lot_id"?: string | null,"memo"?: string | null,"occurred_at"?: string,"purchase_order_line_id"?: string | null,"quantity": number,"sale_record_id"?: string | null,"stock_count_id"?: string | null,"store_id": string,"type": Database["public"]['Enums']["movement_type"],"unit_cost"?: number | null,"waste_reason"?: Database["public"]['Enums']["waste_reason"] | null
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"entered_quantity"?: number | null,"entered_unit_id"?: string | null,"id"?: string,"item_id"?: string,"lot_id"?: string | null,"memo"?: string | null,"occurred_at"?: string,"purchase_order_line_id"?: string | null,"quantity"?: number,"sale_record_id"?: string | null,"stock_count_id"?: string | null,"store_id"?: string,"type"?: Database["public"]['Enums']["movement_type"],"unit_cost"?: number | null
+                    "created_at"?: string,"created_by"?: string | null,"entered_quantity"?: number | null,"entered_unit_id"?: string | null,"id"?: string,"item_id"?: string,"lot_id"?: string | null,"memo"?: string | null,"occurred_at"?: string,"purchase_order_line_id"?: string | null,"quantity"?: number,"sale_record_id"?: string | null,"stock_count_id"?: string | null,"store_id"?: string,"type"?: Database["public"]['Enums']["movement_type"],"unit_cost"?: number | null,"waste_reason"?: Database["public"]['Enums']["waste_reason"] | null
                   }
                   Relationships: [
                     {
@@ -930,7 +930,7 @@ isOneToOne: false
 { Args: { "p_lines": Json,"p_sold_at"?: string }; Returns: number
                            },
 "record_stock_movement":
-{ Args: { "p_expires_on"?: string,"p_item_id": string,"p_memo"?: string,"p_quantity": number,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id"?: string,"p_unit_price"?: number }; Returns: number
+{ Args: { "p_expires_on"?: string,"p_item_id": string,"p_memo"?: string,"p_quantity": number,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id"?: string,"p_unit_price"?: number,"p_waste_reason"?: Database["public"]['Enums']["waste_reason"] }; Returns: number
                            },
 "sale_ingredients":
 { Args: { "p_menu_id": string,"p_option_ids": (string)[] }; Returns: {
@@ -941,16 +941,21 @@ isOneToOne: false
 { Args: { "p_category_id"?: string,"p_memo"?: string,"p_store_id": string }; Returns: string
                            },
 "stock_outflow":
-{ Args: { "p_created_by": string,"p_factor": number,"p_item_id": string,"p_memo": string,"p_occurred_at": string,"p_quantity": number,"p_sale_record_id"?: string,"p_stock_count_id"?: string,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id": string }; Returns: number
+{ Args: { "p_created_by": string,"p_factor": number,"p_item_id": string,"p_memo": string,"p_occurred_at": string,"p_quantity": number,"p_sale_record_id"?: string,"p_stock_count_id"?: string,"p_type": Database["public"]['Enums']["movement_type"],"p_unit_id": string,"p_waste_reason"?: Database["public"]['Enums']["waste_reason"] }; Returns: number
                            },
 "stock_usage_summary":
 { Args: { "p_from": string,"p_store_id": string,"p_to": string }; Returns: {
               "consumed": number,"count_adjusted": number,"counted": boolean,"item_id": string,"manual_adjusted": number,"received": number,"sold": number,"wasted": number
             }[]
+                           },
+"waste_summary":
+{ Args: { "p_from": string,"p_store_id": string,"p_to": string }; Returns: {
+              "item_id": string,"quantity": number,"reason": Database["public"]['Enums']["waste_reason"]
+            }[]
                            }
           }
           Enums: {
-            "base_unit": "g"|"ml"|"ea","member_role": "owner"|"manager"|"staff","movement_type": "receive"|"consume"|"sale"|"waste"|"adjust","option_alias_kind": "option"|"menu"|"ignore","option_rule_kind": "scale"|"replace"|"add","purchase_order_status": "draft"|"ordered"|"partially_received"|"received"|"cancelled","sale_source": "manual"|"csv"|"pos","stock_count_status": "in_progress"|"completed"|"cancelled"
+            "base_unit": "g"|"ml"|"ea","member_role": "owner"|"manager"|"staff","movement_type": "receive"|"consume"|"sale"|"waste"|"adjust","option_alias_kind": "option"|"menu"|"ignore","option_rule_kind": "scale"|"replace"|"add","purchase_order_status": "draft"|"ordered"|"partially_received"|"received"|"cancelled","sale_source": "manual"|"csv"|"pos","stock_count_status": "in_progress"|"completed"|"cancelled","waste_reason": "expired"|"spoiled"|"mistake"|"damaged"|"other"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1070,7 +1075,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "base_unit": ["g", "ml", "ea"],"member_role": ["owner", "manager", "staff"],"movement_type": ["receive", "consume", "sale", "waste", "adjust"],"option_alias_kind": ["option", "menu", "ignore"],"option_rule_kind": ["scale", "replace", "add"],"purchase_order_status": ["draft", "ordered", "partially_received", "received", "cancelled"],"sale_source": ["manual", "csv", "pos"],"stock_count_status": ["in_progress", "completed", "cancelled"]
+            "base_unit": ["g", "ml", "ea"],"member_role": ["owner", "manager", "staff"],"movement_type": ["receive", "consume", "sale", "waste", "adjust"],"option_alias_kind": ["option", "menu", "ignore"],"option_rule_kind": ["scale", "replace", "add"],"purchase_order_status": ["draft", "ordered", "partially_received", "received", "cancelled"],"sale_source": ["manual", "csv", "pos"],"stock_count_status": ["in_progress", "completed", "cancelled"],"waste_reason": ["expired", "spoiled", "mistake", "damaged", "other"]
           }
         }
 } as const

@@ -101,6 +101,8 @@ export async function recordStock(
     quantity: number | string;
     price?: string;
     expiresOn?: string;
+    /** 폐기 사유 (폐기일 때, 기본 "유통기한 지남") */
+    wasteReason?: string;
   },
 ) {
   const type = options.type ?? "입고";
@@ -109,6 +111,7 @@ export async function recordStock(
   await p.fill("#stock-quantity", String(options.quantity));
   if (options.price) await p.fill("#stock-price", options.price);
   if (options.expiresOn) await p.fill("#stock-expires", options.expiresOn);
+  if (type === "폐기") await p.selectOption("#stock-waste-reason", { label: options.wasteReason ?? "유통기한 지남" });
   await p.getByRole("button", { name: `${type} 기록` }).click();
   await p.waitForFunction(() => (document.querySelector("#stock-quantity") as HTMLInputElement).value === "");
 }

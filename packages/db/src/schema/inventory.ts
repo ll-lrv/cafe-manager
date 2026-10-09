@@ -14,7 +14,7 @@ import {
 import { createdAt, id, quantity } from "./_shared";
 import { itemUnits, items } from "./catalog";
 import { stockCounts } from "./counts";
-import { movementType } from "./enums";
+import { movementType, wasteReason } from "./enums";
 import { purchaseOrderLines } from "./purchasing";
 import { saleRecords } from "./sales";
 import { profiles, stores } from "./stores";
@@ -63,6 +63,8 @@ export const stockMovements = pgTable(
     /** 기본 단위 1개당 원가, 원(KRW). 입고 기록에만 사용 */
     unitCost: numeric("unit_cost", { precision: 14, scale: 4, mode: "number" }),
     memo: text("memo"),
+    /** 폐기 사유 (waste 만). 사유 기능 전에 기록한 폐기는 비어 있다 */
+    wasteReason: wasteReason("waste_reason"),
     purchaseOrderLineId: uuid("purchase_order_line_id").references(
       () => purchaseOrderLines.id,
       { onDelete: "set null" },
@@ -88,6 +90,7 @@ export const stockMovements = pgTable(
         or (${t.type} = 'sale' and ${t.quantity} <> 0)
         or (${t.type} = 'adjust' and ${t.quantity} <> 0)`,
     ),
+    check("stock_movements_waste_reason_check", sql`${t.wasteReason} is null or ${t.type} = 'waste'`),
   ],
 );
 

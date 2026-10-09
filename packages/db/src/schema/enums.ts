@@ -17,6 +17,12 @@ export const movementType = pgEnum("movement_type", [
   "adjust",
 ]);
 
+/**
+ * 폐기 사유 (waste 기록만). packages/core 의 WASTE_REASONS 와 같은 값
+ * expired: 유통기한 지남  spoiled: 상함·품질 이상  mistake: 제조 실수  damaged: 쏟음·파손  other: 기타(메모에 사유)
+ */
+export const wasteReason = pgEnum("waste_reason", ["expired", "spoiled", "mistake", "damaged", "other"]);
+
 export const purchaseOrderStatus = pgEnum("purchase_order_status", [
   "draft",
   "ordered",
